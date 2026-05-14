@@ -117,4 +117,4 @@ def eval_spline_basis_equispaced_numeric(degree, t_0, t_n, num_knots, x_vals):
     for i in range(len(basis[degree])):
         B_func = sp.lambdify(x, basis[degree][i], "numpy")
         B_vals[:, i] = B_func(x_vals)
-    return {"B": B_vals, "x": x_vals, "full_knots": full_knots, "interior_knots": interior_knots}
+    return {"B": B_vals, "x": x_vals, "full_knots": full_knots, "interior_knots": interior_knots, 'symbolic':B}
