@@ -7,6 +7,12 @@ run_name = '1'
 # 0, MvN
 builder = 'MvN'
 
+a = 1
+b = 0.005
+order = 2
+spline_degree = 3
+n_internal_knots = 20
+
 def f1(x):
     return x/1.758
 def f2(x):

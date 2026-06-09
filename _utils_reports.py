@@ -28,6 +28,13 @@ def write_report_path(model_key, reports_path):
     (f, sigma, implementation, penalised, replication, builder) = model_key
     return os.path.join(reports_path, f"report_{f}_{sigma}_{implementation}_{penalised}_{replication}({builder}).html")
 
+def extract_w_post(idata):
+    w_vars = sorted([v for v in idata.posterior.data_vars if v.startswith("w")], reverse=True)
+    w_post = np.hstack([
+        idata.posterior[v].values.reshape(idata.posterior[v].sizes["chain"]
+                                        * idata.posterior[v].sizes["draw"], -1)
+        for v in w_vars])
+    return w_post
 
 def extract_sampling_time(model_key, idatas_path):
     (f, sigma, implementation, penalised, replication, builder) = model_key
@@ -94,7 +101,6 @@ def html_report(model_key, reports_path, idatas_path, functions,
     #var_names_list = implementation_var_names[implementation]
     #var_names += var_names_list[int(penalised) * (len(var_names_list)>1)]
 
-
     # summary table
     summary_df = az.summary(idata, var_names=var_names)
     summary_html = summary_df.to_html()
@@ -128,21 +134,17 @@ def html_report(model_key, reports_path, idatas_path, functions,
         #w0_post = idata.posterior["w0"].values.reshape(-1, order-1)
         #w_post = np.hstack([wp_post, w0_post])
 
-    w_vars = sorted([v for v in idata.posterior.data_vars if v.startswith("w")], reverse=True)
-    w_post = np.hstack([
-        idata.posterior[v].values.reshape(idata.posterior[v].sizes["chain"]
-                                        * idata.posterior[v].sizes["draw"], -1)
-        for v in w_vars])
+    w_post = extract_w_post(idata)
 
     X = X[x_data_order, :]
     f_post = X @ w_post.T
-    f_mean = f_post.mean(axis=1)
+    f_mean = np.mean(f_post, axis=1)
     f_median = np.median(f_post, axis=1)
     f_975 = np.percentile(f_post, 97.5, axis=1)
     f_025 = np.percentile(f_post, 2.5, axis=1)
 
     f_plot_post = X_plot @ w_post.T
-    f_plot_mean = f_plot_post.mean(axis=1)
+    f_plot_mean = np.mean(f_plot_post, axis=1)
     f_plot_median = np.median(f_plot_post, axis=1)
     f_plot_975 = np.percentile(f_plot_post, 97.5, axis=1)
     f_plot_025 = np.percentile(f_plot_post, 2.5, axis=1)
