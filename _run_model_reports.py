@@ -14,13 +14,13 @@ with open(data_path, "rb") as data_file:
 
 def init_worker():
     """Initialize worker process"""
-    global implementation_var_names, a, b, order, spline_degree, n_internal_knots, data, html_report_args
+    global a, b, order, spline_degree, n_internal_knots, data, html_report_args
 
-    implementation_var_names = {'standard': [['w']],
-             'centring+dropping': [['w']],
-             'conditioning': [['theta']],
-             'spectral': [['w'], ['w0', 'wp']],
-             'svd': [['w']]}
+    #implementation_var_names = {'standard': [['w']],
+             #'centring+dropping': [['w']],
+             #'conditioning': [['theta']],
+             #'spectral': [['w'], ['w0', 'wp']],
+             #'svd': [['w']]}
     
     a = 1
     b = 0.005
@@ -29,7 +29,7 @@ def init_worker():
     n_internal_knots = 20
     
     html_report_args = {'reports_path': reports_path, 'idatas_path': idatas_path, 'functions': functions,
-                        'implementation_var_names': implementation_var_names, 'a': a, 'b': b,
+                        'a': a, 'b': b,
                         'order': order, 'spline_degree': spline_degree,
                         'n_internal_knots': n_internal_knots, 'data': data}
 

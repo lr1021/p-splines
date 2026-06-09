@@ -44,7 +44,7 @@ def worker(task):
         model_data = data[(f, sigma)][replication]
         x_data = model_data[0]
         y_data = model_data[1]
-        model, X, X_plot = builder_dict[builder](x_data, y_data, a, b,
+        model, X, X_plot, var_names = builder_dict[builder](x_data, y_data, a, b,
                             spline_degree, n_internal_knots,
                             implementation, penalised, order)
         with model:

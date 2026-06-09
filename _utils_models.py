@@ -15,6 +15,7 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
         beta_0 = pm.Normal('beta_0', mu=0, sigma=100)
         sigma_2 = pm.InverseGamma('sigma_2', alpha=a, beta=b)
 
+        var_names = ['beta_0', 'sigma_2', 'tau']
         if not penalised:
             tau = pm.Gamma("tau", alpha=a, beta=b)
             #tau = pm.Deterministic("tau", pt.as_tensor_variable(1.0))
@@ -22,7 +23,8 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
             tau = pm.Gamma("tau", alpha=a, beta=b)
             tau_p = pm.Gamma("tau_p", alpha=a, beta=b)
             #tau_p = pm.Deterministic("tau_p", pt.as_tensor_variable(1.0))
-
+            var_names += ['tau_p']
+        
         # Spline implementation
         eval_B = eval_spline_basis_equispaced_numeric(spline_degree, np.min(x_data), np.max(x_data), n_internal_knots, x_data)
         B = eval_B['B']
@@ -46,6 +48,7 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
                                             - 0.5 * k * pt.log(tau)
                                             + 0.5 * logdet)
             f = pm.math.dot(X, w)
+            var_names += ['w']
 
         elif implementation=='centring+dropping': # centring+dropping = Gressani implementation, adjusted penalty
             X = B.copy()
@@ -55,9 +58,9 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
             X = X[:, :-1]  # drop the last column to ensure identifiability
             X_plot = X_plot[:, :-1]
 
-            w = pm.Normal("w",mu=0, tau=tau, shape=k-1, dims="w_dim")
+            w_cd = pm.Normal("w_cd",mu=0, tau=tau, shape=k-1, dims="w_cd_dim")
             if penalised:
-                Dw = pt.dot(difference_matrix(k, order=order)[:, :-1], w)
+                Dw = pt.dot(difference_matrix(k, order=order)[:, :-1], w_cd)
                 K = difference_matrix(k, order=order)[:, :-1].T @ difference_matrix(k, order=order)[:, :-1]
                 penalty = pt.dot(Dw, Dw)
                 Q = tau_p * K + tau * np.eye(k-1)
@@ -65,19 +68,22 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
                 pm.Potential("spline_penalty", - 0.5 * tau_p * penalty
                                             - 0.5 * (k-1) * pt.log(tau)
                                             + 0.5 * logdet)
-            f = pm.math.dot(X, w)
+            f = pm.math.dot(X, w_cd)
+            var_names += ['w_cd']
 
         elif implementation=='conditioning': # conditioning = Chen implementation, map to constrained conditioned space
             X = B.copy()
             X_plot = B_plot.copy()
             Z = null_space(np.ones((X.shape[0], 1)).T @ X)
+            X = X @ Z
+            X_plot = X_plot @ Z
             ZTZ = Z.T @ Z
-            theta = pm.MvNormal("theta", mu=np.zeros(Z.shape[1]), tau=tau*ZTZ, shape=Z.shape[1], dims="theta_dim")
+            w_c = pm.MvNormal("w_c", mu=np.zeros(Z.shape[1]), tau=tau*ZTZ, shape=Z.shape[1], dims="w_c_dim")
 
-            model.add_coord("w_dim", range(k))
-            w = pm.Deterministic("w", pt.dot(Z,theta), dims="w_dim")
+            model.add_coord("pen_w_dim", range(k))
+            pen_w = pm.Deterministic("pen_w", pt.dot(Z, w_c), dims="pen_w_dim")
             if penalised:
-                Dw = pt.dot(difference_matrix(k, order=order)[:, :], w)
+                Dw = pt.dot(difference_matrix(k, order=order)[:, :], pen_w)
                 K = difference_matrix(k, order=order)[:, :].T @ difference_matrix(k, order=order)[:, :]
                 penalty = pt.dot(Dw, Dw)
                 Q = tau_p * K + tau * np.eye(k)
@@ -85,8 +91,9 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
                 pm.Potential("spline_penalty", - 0.5 * tau_p * penalty
                                             - 0.5 * (k-1) * pt.log(tau)
                                             + 0.5 * logdet)
-            f = pm.math.dot(X, w)
-        
+            f = pm.math.dot(X, w_c)
+            var_names += ['w_c']
+
         elif implementation=='spectral': # spectral = scheipl implementation, decompose improper prior
             X = B.copy()
             X_plot = B_plot.copy()
@@ -121,15 +128,15 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
 
                 X_plot_0 = X_plot@w_trends / (np.max(X0_plot, axis=0) - np.min(X0_plot, axis=0))
 
-                wp = pm.Normal("wp",mu=0, tau=tau_p, shape=r, dims="wp_dim")
-                w0 = pm.Normal("w0", mu=0, tau=tau, shape=(order-1), dims="w0_dim")
+                w_p = pm.Normal("w_p",mu=0, tau=tau_p, shape=r, dims="w_p_dim")
+                w_0 = pm.Normal("w_0", mu=0, tau=tau, shape=(order-1), dims="w_0_dim")
                 X = np.hstack([Xp, X0])
                 X_plot = np.hstack([X_plot_p, X_plot_0])
-                f = pm.math.dot(Xp, wp) + pm.math.dot(X0, w0)
+                f = pm.math.dot(Xp, w_p) + pm.math.dot(X0, w_0)
             else:
-                w = pm.Normal("w",mu=0, tau=tau, shape=k, dims="w_dim")
-                print("Unpenalised Spectral = standard implementation")
-                f = pm.math.dot(X, w)
+                raise ValueError("Unpenalised Spectral = standard implementation, not implemented separately")
+            
+            var_names += ['w_p', 'w_0']
             
         elif implementation=='svd': # svd = svd decomposition, decompose f_ construction
             X = B.copy()
@@ -146,9 +153,9 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
 
             X = Up * Sp
 
-            w = pm.Normal("w", mu=0, tau=tau, shape=k-1, dims="w_dim")
+            w_svd = pm.Normal("w_svd", mu=0, tau=tau, shape=k-1, dims="w_svd_dim")
             if penalised:
-                DVpw = pt.dot(pt.dot(difference_matrix(k, order=order), Vp), w)
+                DVpw = pt.dot(pt.dot(difference_matrix(k, order=order), Vp), w_svd)
                 K = Vp.T @ difference_matrix(k, order=order).T @ difference_matrix(k, order=order) @ Vp
                 penalty = pt.dot(DVpw, DVpw)
                 Q = tau_p * K + tau * np.eye(k-1)
@@ -156,13 +163,14 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
                 pm.Potential("spline_penalty", - 0.5 * tau_p * penalty
                                             - 0.5 * (k-1) * pt.log(tau)
                                             + 0.5 * logdet)
-            f = pm.math.dot(X, w)
+            f = pm.math.dot(X, w_svd)
+            var_names += ['w_svd']
 
 
         eta = beta_0 + f
         # Likelihood
         y_obs = pm.Normal('y_obs', mu=eta, sigma=np.sqrt(sigma_2), observed=y_data)
-    return model, X, X_plot
+    return model, X, X_plot, var_names
 
 def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, implementation, penalised, order):
     model = pm.Model()
@@ -171,6 +179,7 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
         beta_0 = pm.Normal('beta_0', mu=0, sigma=100)
         sigma_2 = pm.InverseGamma('sigma_2', alpha=a, beta=b)
 
+        var_names = ['beta_0', 'sigma_2', 'tau']
         if not penalised:
             tau = pm.Gamma("tau", alpha=a, beta=b)
             #tau = pm.Deterministic("tau", pt.as_tensor_variable(1.0))
@@ -178,6 +187,7 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
             tau = pm.Gamma("tau", alpha=a, beta=b)
             tau_p = pm.Gamma("tau_p", alpha=a, beta=b)
             #tau_p = pm.Deterministic("tau_p", pt.as_tensor_variable(1.0))
+            var_names += ['tau_p']
 
         # Spline implementation
         eval_B = eval_spline_basis_equispaced_numeric(spline_degree, np.min(x_data), np.max(x_data), n_internal_knots, x_data)
@@ -201,7 +211,7 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
                 w = pm.MvNormal("w", mu=np.zeros(k), tau=Q, dims="w_dim")
                 #Dw = pt.dot(difference_matrix(k, order=order), w)
                 #penalty = pt.dot(Dw, Dw)
-                
+            var_names += ['w']
                 
             f = pm.math.dot(X, w)
 
@@ -213,9 +223,9 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
             X = X[:, :-1]  # drop the last column to ensure identifiability
             X_plot = X_plot[:, :-1]
 
-            w = pm.Normal("w",mu=0, tau=tau, shape=k-1, dims="w_dim")
+            w_cd = pm.Normal("w_cd",mu=0, tau=tau, shape=k-1, dims="w_cd_dim")
             if penalised:
-                Dw = pt.dot(difference_matrix(k, order=order)[:, :-1], w)
+                Dw = pt.dot(difference_matrix(k, order=order)[:, :-1], w_cd)
                 K = difference_matrix(k, order=order)[:, :-1].T @ difference_matrix(k, order=order)[:, :-1]
                 penalty = pt.dot(Dw, Dw)
                 Q = tau_p * K + tau * np.eye(k-1)
@@ -223,19 +233,22 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
                 pm.Potential("spline_penalty", - 0.5 * tau_p * penalty
                                             - 0.5 * (k-1) * pt.log(tau)
                                             + 0.5 * logdet)
-            f = pm.math.dot(X, w)
+            f = pm.math.dot(X, w_cd)
+            var_names += ['w_cd']
 
         elif implementation=='conditioning': # conditioning = Chen implementation, map to constrained conditioned space
             X = B.copy()
             X_plot = B_plot.copy()
             Z = null_space(np.ones((X.shape[0], 1)).T @ X)
+            X = X @ Z
+            X_plot = X_plot @ Z
             ZTZ = Z.T @ Z
-            theta = pm.MvNormal("theta", mu=np.zeros(Z.shape[1]), tau=tau*ZTZ, shape=Z.shape[1], dims="theta_dim")
+            w_c = pm.MvNormal("w_c", mu=np.zeros(Z.shape[1]), tau=tau*ZTZ, shape=Z.shape[1], dims="w_c_dim")
 
-            model.add_coord("w_dim", range(k))
-            w = pm.Deterministic("w", pt.dot(Z,theta), dims="w_dim")
+            model.add_coord("pen_w_dim", range(k))
+            pen_w = pm.Deterministic("pen_w", pt.dot(Z, w_c), dims="pen_w_dim")
             if penalised:
-                Dw = pt.dot(difference_matrix(k, order=order)[:, :], w)
+                Dw = pt.dot(difference_matrix(k, order=order)[:, :], pen_w)
                 K = difference_matrix(k, order=order)[:, :].T @ difference_matrix(k, order=order)[:, :]
                 penalty = pt.dot(Dw, Dw)
                 Q = tau_p * K + tau * np.eye(k)
@@ -243,8 +256,8 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
                 pm.Potential("spline_penalty", - 0.5 * tau_p * penalty
                                             - 0.5 * (k-1) * pt.log(tau)
                                             + 0.5 * logdet)
-            f = pm.math.dot(X, w)
-        
+            f = pm.math.dot(X, w_c)
+            var_names += ['w_c']
         elif implementation=='spectral': # spectral = scheipl implementation, decompose improper prior
             X = B.copy()
             X_plot = B_plot.copy()
@@ -279,16 +292,14 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
 
                 X_plot_0 = X_plot@w_trends / (np.max(X0_plot, axis=0) - np.min(X0_plot, axis=0))
 
-                wp = pm.Normal("wp",mu=0, tau=tau_p, shape=r, dims="wp_dim")
-                w0 = pm.Normal("w0", mu=0, tau=tau, shape=(order-1), dims="w0_dim")
+                w_p = pm.Normal("w_p",mu=0, tau=tau_p, shape=r, dims="w_p_dim")
+                w_0 = pm.Normal("w_0", mu=0, tau=tau, shape=(order-1), dims="w_0_dim")
                 X = np.hstack([Xp, X0])
                 X_plot = np.hstack([X_plot_p, X_plot_0])
-                f = pm.math.dot(Xp, wp) + pm.math.dot(X0, w0)
+                f = pm.math.dot(Xp, w_p) + pm.math.dot(X0, w_0)
             else:
-                w = pm.Normal("w",mu=0, tau=tau, shape=k, dims="w_dim")
-                print("Unpenalised Spectral = standard implementation")
-                f = pm.math.dot(X, w)
-            
+                raise ValueError("Unpenalised Spectral = standard implementation, not implemented separately")
+            var_names += ['w_p', 'w_0']
         elif implementation=='svd': # svd = svd decomposition, decompose f_ construction
             X = B.copy()
             X_plot = B_plot.copy()
@@ -304,9 +315,9 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
 
             X = Up * Sp
 
-            w = pm.Normal("w", mu=0, tau=tau, shape=k-1, dims="w_dim")
+            w_svd = pm.Normal("w_svd", mu=0, tau=tau, shape=k-1, dims="w_svd_dim")
             if penalised:
-                DVpw = pt.dot(pt.dot(difference_matrix(k, order=order), Vp), w)
+                DVpw = pt.dot(pt.dot(difference_matrix(k, order=order), Vp), w_svd)
                 K = Vp.T @ difference_matrix(k, order=order).T @ difference_matrix(k, order=order) @ Vp
                 penalty = pt.dot(DVpw, DVpw)
                 Q = tau_p * K + tau * np.eye(k-1)
@@ -314,13 +325,14 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
                 pm.Potential("spline_penalty", - 0.5 * tau_p * penalty
                                             - 0.5 * (k-1) * pt.log(tau)
                                             + 0.5 * logdet)
-            f = pm.math.dot(X, w)
+            f = pm.math.dot(X, w_svd)
+            var_names += ['w_svd']
 
 
         eta = beta_0 + f
         # Likelihood
         y_obs = pm.Normal('y_obs', mu=eta, sigma=np.sqrt(sigma_2), observed=y_data)
-    return model, X, X_plot
+    return model, X, X_plot, var_names
 
 builder_dict = {'0': build_model,
                 'MvN': build_model_MvN}

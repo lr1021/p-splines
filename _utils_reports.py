@@ -24,9 +24,9 @@ def write_idata_path(model_key, idatas_path):
     (f, sigma, implementation, penalised, replication, builder) = model_key
     return os.path.join(idatas_path, f"idata_{f}_{sigma}_{implementation}_{penalised}_{replication}({builder}).nc")
 
-def write_report_path(model_key, idatas_path):
+def write_report_path(model_key, reports_path):
     (f, sigma, implementation, penalised, replication, builder) = model_key
-    return os.path.join(idatas_path, f"report_{f}_{sigma}_{implementation}_{penalised}_{replication}({builder}).html")
+    return os.path.join(reports_path, f"report_{f}_{sigma}_{implementation}_{penalised}_{replication}({builder}).html")
 
 
 def extract_sampling_time(model_key, idatas_path):
@@ -45,11 +45,11 @@ def extract_sampling_time(model_key, idatas_path):
     #sampling_time = idata.sample_stats.attrs["sampling_time"]
     return sampling_time
 
-def html_report(model_key, reports_path, idatas_path, functions, implementation_var_names,
+def html_report(model_key, reports_path, idatas_path, functions,
                 a, b, order, spline_degree, n_internal_knots, data,
                 replace_existing=False):
     (f, sigma, implementation, penalised, replication, builder) = model_key
-    report_path = write_report_path(model_key, idatas_path)
+    report_path = write_report_path(model_key, reports_path)
     if os.path.exists(report_path) and not replace_existing:
         print(f"Report already exists for model key: {model_key}")
         return
@@ -60,12 +60,11 @@ def html_report(model_key, reports_path, idatas_path, functions, implementation_
         print(f"{idata_path} not found")
         return
     
-    
     model_data = data[(f, sigma)][replication]
     x_data = model_data[0]
     x_data_order = np.argsort(x_data)
     y_data = model_data[1]
-    model, X, X_plot = builder_dict[builder](x_data=x_data, y_data=y_data, a=a, b=b, spline_degree=spline_degree, n_internal_knots=n_internal_knots, implementation=implementation, penalised=penalised, order=order)
+    model, X, X_plot, var_names = builder_dict[builder](x_data=x_data, y_data=y_data, a=a, b=b, spline_degree=spline_degree, n_internal_knots=n_internal_knots, implementation=implementation, penalised=penalised, order=order)
     x_plot = np.linspace(np.min(x_data), np.max(x_data), X_plot.shape[0])
 
     # base and title
@@ -86,15 +85,14 @@ def html_report(model_key, reports_path, idatas_path, functions, implementation_
 
     # divergences
     n_divergent = int(idata.sample_stats["diverging"].sum())
-
     report_parts.append(f"<h2>Divergences: {n_divergent}</h2>")
 
     # variables
-    var_names = ['beta_0', 'sigma_2', 'tau']
-    if penalised:
-        var_names.append('tau_p')
-    var_names_list = implementation_var_names[implementation]
-    var_names += var_names_list[int(penalised) * (len(var_names_list)>1)]
+    #var_names = ['beta_0', 'sigma_2', 'tau']
+    #if penalised:
+        #var_names.append('tau_p')
+    #var_names_list = implementation_var_names[implementation]
+    #var_names += var_names_list[int(penalised) * (len(var_names_list)>1)]
 
 
     # summary table
@@ -123,12 +121,18 @@ def html_report(model_key, reports_path, idatas_path, functions, implementation_
     report_parts.append(f"<h2>Pair Plot</h2><img src='data:image/png;base64,{img_base64}' />")
 
     # spline plot
-    if "w" in idata.posterior:
-        w_post = idata.posterior["w"].values.reshape(-1, X.shape[1])
-    elif "wp" in idata.posterior and "w0" in idata.posterior:
-        wp_post = idata.posterior["wp"].values.reshape(-1, X.shape[1] - (order-1))
-        w0_post = idata.posterior["w0"].values.reshape(-1, order-1)
-        w_post = np.hstack([wp_post, w0_post])
+    #if "w" in idata.posterior:
+        #w_post = idata.posterior["w"].values.reshape(-1, X.shape[1])
+    #elif "wp" in idata.posterior and "w0" in idata.posterior:
+        #wp_post = idata.posterior["wp"].values.reshape(-1, X.shape[1] - (order-1))
+        #w0_post = idata.posterior["w0"].values.reshape(-1, order-1)
+        #w_post = np.hstack([wp_post, w0_post])
+
+    w_vars = sorted([v for v in idata.posterior.data_vars if v.startswith("w")], reverse=True)
+    w_post = np.hstack([
+        idata.posterior[v].values.reshape(idata.posterior[v].sizes["chain"]
+                                        * idata.posterior[v].sizes["draw"], -1)
+        for v in w_vars])
 
     X = X[x_data_order, :]
     f_post = X @ w_post.T
