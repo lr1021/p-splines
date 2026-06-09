@@ -164,7 +164,6 @@ def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implement
         y_obs = pm.Normal('y_obs', mu=eta, sigma=np.sqrt(sigma_2), observed=y_data)
     return model, X, X_plot
 
-
 def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, implementation, penalised, order):
     model = pm.Model()
     with model:
@@ -323,9 +322,8 @@ def build_model_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots, imple
         y_obs = pm.Normal('y_obs', mu=eta, sigma=np.sqrt(sigma_2), observed=y_data)
     return model, X, X_plot
 
-
-
-
+builder_dict = {'0': build_model,
+                'MvN': build_model_MvN}
 
 
 

@@ -15,11 +15,9 @@ from _run_model_keys import model_keys
 import warnings
 warnings.filterwarnings('ignore')
 
-
 for model_key in model_keys:
     print(model_key)
     (f, sigma, implementation, penalised, replication) = model_key
-    
     
     if os.path.exists(f"idata/idata_{model_key[0]}_{model_key[1]}_{model_key[2]}_{model_key[3]}_{model_key[4]}.nc"):
         idata = az.from_netcdf(f"idata/idata_{model_key[0]}_{model_key[1]}_{model_key[2]}_{model_key[3]}_{model_key[4]}.nc")

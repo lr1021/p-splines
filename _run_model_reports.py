@@ -3,25 +3,18 @@ import pickle
 from multiprocessing import Pool
 
 from _utils_reports import html_report
-from _run_model_keys import model_keys, data_path, reports_path, idatas_path
+from _run_model_keys import builder, functions, model_keys, data_path, reports_path, idatas_path
 
 import warnings
 warnings.filterwarnings('ignore')
 
-
 ######################
+with open(data_path, "rb") as data_file:
+        data = pickle.load(data_file)
+
 def init_worker():
     """Initialize worker process"""
-    global data_path, reports_path, idatas_path, functions, implementation_var_names, a, b, order, spline_degree, n_internal_knots, data, html_report_args
-
-    def f1(x):
-        return x/1.758
-    def f2(x):
-        return x**2/2.75 - 1.5
-    def f3(x):
-        return np.sin(x)/0.72
-
-    functions = {f.__name__: f for f in [f1, f2, f3]}
+    global implementation_var_names, a, b, order, spline_degree, n_internal_knots, data, html_report_args
 
     implementation_var_names = {'standard': [['w']],
              'centring+dropping': [['w']],
@@ -34,10 +27,11 @@ def init_worker():
     order = 2
     spline_degree = 3
     n_internal_knots = 20
-    with open(data_path, "rb") as data_file:
-        data = pickle.load(data_file)
     
-    html_report_args = {'reports_path': reports_path, 'idatas_path': idatas_path, 'functions': functions, 'implementation_var_names': implementation_var_names, 'a': a, 'b': b, 'order': order, 'spline_degree': spline_degree, 'n_internal_knots': n_internal_knots, 'data': data}
+    html_report_args = {'reports_path': reports_path, 'idatas_path': idatas_path, 'functions': functions,
+                        'implementation_var_names': implementation_var_names, 'a': a, 'b': b,
+                        'order': order, 'spline_degree': spline_degree,
+                        'n_internal_knots': n_internal_knots, 'data': data}
 
 def worker(task):
     print(task, ' report')
@@ -50,7 +44,10 @@ np.random.shuffle(tasks)
 
 # Number of workers
 N_WORKERS = 50
-if __name__ == "__main__":
+def main():
     with Pool(N_WORKERS, initializer=init_worker) as p:
         results = p.map(worker, tasks)
+
+if __name__ == "__main__":
+    main()
 

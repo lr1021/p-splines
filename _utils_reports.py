@@ -1,11 +1,13 @@
+from re import match
 import numpy as np
 import matplotlib.pyplot as plt
 import arviz as az
 import os
 import io
 import base64
+import pandas as pd
 
-from _utils_models import build_model
+from _utils_models import builder_dict
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -18,15 +20,40 @@ def fig_to_base64(fig):
     plt.close(fig)
     return img_base64
 
+def write_idata_path(model_key, idatas_path):
+    (f, sigma, implementation, penalised, replication, builder) = model_key
+    return os.path.join(idatas_path, f"idata_{f}_{sigma}_{implementation}_{penalised}_{replication}({builder}).nc")
+
+def write_report_path(model_key, idatas_path):
+    (f, sigma, implementation, penalised, replication, builder) = model_key
+    return os.path.join(idatas_path, f"report_{f}_{sigma}_{implementation}_{penalised}_{replication}({builder}).html")
+
+
+def extract_sampling_time(model_key, idatas_path):
+    (f, sigma, implementation, penalised, replication, builder) = model_key
+    timings_path = os.path.join(idatas_path, 'timings.csv')
+    timings_df = pd.read_csv(timings_path)
+    match = timings_df.loc[
+    (timings_df["f"] == f)
+    & (timings_df["sigma"] == sigma)
+    & (timings_df["implementation"] == implementation)
+    & (timings_df["penalised"] == penalised)
+    & (timings_df["replication"] == replication),
+    "runtime_seconds",
+    ]
+    sampling_time = np.mean(match) if not match.empty else np.nan
+    #sampling_time = idata.sample_stats.attrs["sampling_time"]
+    return sampling_time
+
 def html_report(model_key, reports_path, idatas_path, functions, implementation_var_names,
                 a, b, order, spline_degree, n_internal_knots, data,
                 replace_existing=False):
-    (f, sigma, implementation, penalised, replication) = model_key
-    report_path = os.path.join(reports_path, f"report_{f}_{sigma}_{implementation}_{penalised}_{replication}.html")
+    (f, sigma, implementation, penalised, replication, builder) = model_key
+    report_path = write_report_path(model_key, idatas_path)
     if os.path.exists(report_path) and not replace_existing:
         print(f"Report already exists for model key: {model_key}")
         return
-    idata_path = os.path.join(idatas_path, f"idata_{f}_{sigma}_{implementation}_{penalised}_{replication}.nc")
+    idata_path = write_idata_path(model_key, idatas_path)
     if os.path.exists(idata_path):
         idata = az.from_netcdf(idata_path)
     else:
@@ -38,7 +65,7 @@ def html_report(model_key, reports_path, idatas_path, functions, implementation_
     x_data = model_data[0]
     x_data_order = np.argsort(x_data)
     y_data = model_data[1]
-    model, X, X_plot = build_model(x_data=x_data, y_data=y_data, a=a, b=b, spline_degree=spline_degree, n_internal_knots=n_internal_knots, implementation=implementation, penalised=penalised, order=order)
+    model, X, X_plot = builder_dict[builder](x_data=x_data, y_data=y_data, a=a, b=b, spline_degree=spline_degree, n_internal_knots=n_internal_knots, implementation=implementation, penalised=penalised, order=order)
     x_plot = np.linspace(np.min(x_data), np.max(x_data), X_plot.shape[0])
 
     # base and title
@@ -54,7 +81,7 @@ def html_report(model_key, reports_path, idatas_path, functions, implementation_
                         f"<h1>{title}</h1>"]
     
     # sampling time
-    sampling_time = idata.sample_stats.attrs["sampling_time"]
+    sampling_time = extract_sampling_time(model_key, idatas_path)
     report_parts.append(f"<h2>Sampling Time: {sampling_time:.2f}</h2>")
 
     # divergences
