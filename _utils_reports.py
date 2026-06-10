@@ -6,6 +6,7 @@ import os
 import io
 import base64
 import pandas as pd
+import xarray as xr
 
 from _utils_models import builder_dict
 
@@ -30,11 +31,9 @@ def write_report_path(model_key, reports_path):
 
 def extract_w_post(idata):
     w_vars = sorted([v for v in idata.posterior.data_vars if v.startswith("w")], reverse=True)
-    w_post = np.hstack([
-        idata.posterior[v].values.reshape(idata.posterior[v].sizes["chain"]
-                                        * idata.posterior[v].sizes["draw"], -1)
-        for v in w_vars])
-    return w_post
+    w_post = np.concatenate([idata.posterior[v].values for v in w_vars], axis=2)
+    w_post_flat = w_post.reshape(-1, w_post.shape[-1])
+    return w_post, w_post_flat
 
 def extract_sampling_time(model_key, idatas_path):
     (f, sigma, implementation, penalised, replication, builder) = model_key
@@ -58,7 +57,7 @@ def html_report(model_key, reports_path, idatas_path, functions,
     (f, sigma, implementation, penalised, replication, builder) = model_key
     report_path = write_report_path(model_key, reports_path)
     if os.path.exists(report_path) and not replace_existing:
-        print(f"Report already exists for model key: {model_key}")
+        # print(f"Report already exists for model key: {model_key}")
         return
     idata_path = write_idata_path(model_key, idatas_path)
     if os.path.exists(idata_path):
@@ -107,6 +106,35 @@ def html_report(model_key, reports_path, idatas_path, functions,
     report_parts.append("<h2>Posterior Summary</h2>")
     report_parts.append(summary_html)
 
+    f_metrics = {   "ess_bulk_min/s": [],
+                    "ess_bulk_p5/s": [],
+                    "ess_bulk_mean/s": [],
+                    "ess_tail_min/s": [],
+                    "ess_tail_p5/s": [],
+                    "ess_tail_mean/s": [],
+                    "r_hat_max": [],
+                    "r_hat>1.01_mean": []}
+    # f posterior summaries
+    w_post, _ = extract_w_post(idata)
+    #f_plot_post = np.einsum('ij,cdj->cdi', X_plot, w_post)
+    f_plot_post = w_post @ X_plot.T
+    f_idata = az.convert_to_inference_data(xr.DataArray(f_plot_post,
+                                                        dims=["chain", "draw", "x"]))
+    f_rhat = az.rhat(f_idata)["x"].values
+    f_ess_bulk = az.ess(f_idata, method="bulk")["x"].values / sampling_time
+    f_ess_tail = az.ess(f_idata, method="tail")["x"].values / sampling_time
+    # f metrics
+    f_metrics['ess_bulk_min/s'].append(np.min(f_ess_bulk))
+    f_metrics['ess_bulk_p5/s'].append(np.percentile(f_ess_bulk, 5))
+    f_metrics['ess_bulk_mean/s'].append(np.mean(f_ess_bulk))
+    f_metrics['ess_tail_min/s'].append(np.min(f_ess_tail))
+    f_metrics['ess_tail_p5/s'].append(np.percentile(f_ess_tail, 5))
+    f_metrics['ess_tail_mean/s'].append(np.mean(f_ess_tail))
+    f_metrics['r_hat_max'].append(np.max(f_rhat))
+    f_metrics['r_hat>1.01_mean'].append(np.mean(f_rhat > 1.01))
+    report_parts.append("<h2>f Summary</h2>")
+    report_parts.append(pd.DataFrame(f_metrics).to_html(index=False))
+
     # traces
     trace_axes = az.plot_trace(idata, var_names=var_names)
     fig = trace_axes.ravel()[0].figure
@@ -134,16 +162,16 @@ def html_report(model_key, reports_path, idatas_path, functions,
         #w0_post = idata.posterior["w0"].values.reshape(-1, order-1)
         #w_post = np.hstack([wp_post, w0_post])
 
-    w_post = extract_w_post(idata)
+    _, w_post_flat = extract_w_post(idata)
 
     X = X[x_data_order, :]
-    f_post = X @ w_post.T
+    f_post = X @ w_post_flat.T
     f_mean = np.mean(f_post, axis=1)
     f_median = np.median(f_post, axis=1)
     f_975 = np.percentile(f_post, 97.5, axis=1)
     f_025 = np.percentile(f_post, 2.5, axis=1)
 
-    f_plot_post = X_plot @ w_post.T
+    f_plot_post = X_plot @ w_post_flat.T
     f_plot_mean = np.mean(f_plot_post, axis=1)
     f_plot_median = np.median(f_plot_post, axis=1)
     f_plot_975 = np.percentile(f_plot_post, 97.5, axis=1)

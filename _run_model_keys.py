@@ -1,11 +1,26 @@
 import os
 import numpy as np
 
-run_name = '1'
+run_name = '5 non penalised'
 ###
 
-# 0, MvN
-builder = 'MvN'
+# f, sigma
+f_sigma_list = [('f3', 0.33)]
+# replication
+replication_list = list(range(20))
+# replication_list = [8]
+# implementation
+#implementation_list = ['conditioning', 'ortho_conditioning']#['post_centring', 'ortho_post_centring', 'centring', 'ortho_centring', 'centring+dropping', 'ortho_centring+dropping']#, 'centring+dropping', 'conditioning', 'spectral', 'svd']
+implementation_list = ['post_centring', 'ortho_post_centring',
+                       'centring', 'ortho_centring',
+                       'centring+dropping', 'ortho_centring+dropping',
+                       'conditioning', 'ortho_conditioning',
+                       'svd']
+# implementation_list = ['ortho_conditioning']
+# 0, MvN, ortho_diag
+builder_list = ['ortho_MvN']
+# penalised
+penalised_list = [False]
 
 a = 1
 b = 0.005
@@ -23,13 +38,13 @@ def f3(x):
 functions = {f.__name__: f for f in [f1, f2, f3]}
 
 model_keys = []
-for f, sigma in [('f3', 0.33)]:
-    for replication in [0]:
-        for implementation in ['standard', 'centring+dropping', 'conditioning', 'spectral', 'svd']:
-            if implementation=='spectral':
-                model_keys.append((f, sigma, implementation, True, replication, builder))
-            else:
-                for penalised in [True, False]:
+for f, sigma in f_sigma_list:
+    for replication in replication_list:
+        for implementation in implementation_list:
+            for builder in builder_list:
+                for penalised in penalised_list:
+                    if (implementation=='spectral')&(not penalised):
+                        continue
                     model_keys.append((f, sigma, implementation, penalised, replication, builder))
 
 # Paths

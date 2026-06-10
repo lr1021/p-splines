@@ -7,7 +7,8 @@ from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functi
 
 import warnings
 warnings.filterwarnings('ignore')
-
+######################
+replace_existing = False
 ######################
 with open(data_path, "rb") as data_file:
         data = pickle.load(data_file)
@@ -23,14 +24,14 @@ def init_worker():
     
 
 def worker(task):
-    print(task, ' report')
+    # print(task, ' report')
 
     html_report_args = {'reports_path': reports_path, 'idatas_path': idatas_path, 'functions': functions,
                         'a': a, 'b': b,
                         'order': order, 'spline_degree': spline_degree,
                         'n_internal_knots': n_internal_knots, 'data': data}
     
-    html_report(task, **html_report_args, replace_existing=True)
+    html_report(task, **html_report_args, replace_existing=replace_existing)
 
 # Create tasks list
 tasks = list(model_keys)
