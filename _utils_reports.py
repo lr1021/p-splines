@@ -37,7 +37,7 @@ def extract_w_post(idata):
 
 def extract_sampling_time(model_key, idatas_path):
     (f, sigma, implementation, penalised, replication, builder) = model_key
-    timings_path = os.path.join(idatas_path, 'timings.csv')
+    timings_path = os.path.join(idatas_path, '../timings.csv')
     timings_df = pd.read_csv(timings_path)
     match = timings_df.loc[
     (timings_df["f"] == f)
@@ -54,10 +54,11 @@ def extract_sampling_time(model_key, idatas_path):
 def html_report(model_key, reports_path, idatas_path, functions,
                 a, b, order, spline_degree, n_internal_knots, data,
                 replace_existing=False):
+    print(model_key, ' report')
     (f, sigma, implementation, penalised, replication, builder) = model_key
     report_path = write_report_path(model_key, reports_path)
     if os.path.exists(report_path) and not replace_existing:
-        # print(f"Report already exists for model key: {model_key}")
+        print(f"Report already exists for model key: {model_key}")
         return
     idata_path = write_idata_path(model_key, idatas_path)
     if os.path.exists(idata_path):

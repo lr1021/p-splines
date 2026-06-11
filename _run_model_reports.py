@@ -3,12 +3,11 @@ import pickle
 from multiprocessing import Pool
 
 from _utils_reports import html_report
-from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functions, model_keys, directory_path, data_path, reports_path, idatas_path, builder
+from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functions, model_keys, directory_path, data_path, reports_path, idatas_path, builder, reports_workers, replace_reports
 
 import warnings
 warnings.filterwarnings('ignore')
-######################
-replace_existing = False
+
 ######################
 with open(data_path, "rb") as data_file:
         data = pickle.load(data_file)
@@ -31,7 +30,7 @@ def worker(task):
                         'order': order, 'spline_degree': spline_degree,
                         'n_internal_knots': n_internal_knots, 'data': data}
     
-    html_report(task, **html_report_args, replace_existing=replace_existing)
+    html_report(task, **html_report_args, replace_existing=replace_reports)
 
 # Create tasks list
 tasks = list(model_keys)
@@ -39,7 +38,7 @@ np.random.seed(42)
 np.random.shuffle(tasks)
 
 # Number of workers
-N_WORKERS = 50
+N_WORKERS = reports_workers
 def main():
     with Pool(N_WORKERS, initializer=init_worker) as p:
         results = p.map(worker, tasks)

@@ -1,26 +1,38 @@
 import os
 import numpy as np
 
-run_name = '5 non penalised'
+run_idatas = True
+replace_idatas = False
+idatas_workers = 8
+run_reports = True
+replace_reports = False
+reports_workers = 50
+run_replications_report = False
+replications_report_workers = 100
+
+run_name = '7 ortho diag (f3, 0.33) 0'
 ###
 
 # f, sigma
 f_sigma_list = [('f3', 0.33)]
 # replication
-replication_list = list(range(20))
-# replication_list = [8]
+replication_list = list(range(100))[:]
+# replication_list = [0, 80]
 # implementation
 #implementation_list = ['conditioning', 'ortho_conditioning']#['post_centring', 'ortho_post_centring', 'centring', 'ortho_centring', 'centring+dropping', 'ortho_centring+dropping']#, 'centring+dropping', 'conditioning', 'spectral', 'svd']
 implementation_list = ['post_centring', 'ortho_post_centring',
                        'centring', 'ortho_centring',
                        'centring+dropping', 'ortho_centring+dropping',
                        'conditioning', 'ortho_conditioning',
-                       'svd']
+                       'svd',
+                       'spectral'][:]
+# implementation_list = ['conditioning']
 # implementation_list = ['ortho_conditioning']
+#implementation_list = ['post_centring', 'ortho_post_centring']
 # 0, MvN, ortho_diag
-builder_list = ['ortho_MvN']
+builder_list = ['ortho_diag']
 # penalised
-penalised_list = [False]
+penalised_list = [True]
 
 a = 1
 b = 0.005
