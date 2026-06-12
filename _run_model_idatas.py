@@ -1,3 +1,10 @@
+import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import gc
 import sys
 import signal
@@ -5,7 +12,6 @@ import signal
 import numpy as np
 import matplotlib.pyplot as plt
 import arviz as az
-import os
 import pymc as pm
 import pandas as pd
 import pickle
@@ -23,7 +29,7 @@ warnings.filterwarnings('ignore')
 n_tune = 1000
 n_draws = 1000
 n_chains = 4
-n_cores = 1
+n_cores = 4
 
 ######################
 with open(data_path, "rb") as data_file:

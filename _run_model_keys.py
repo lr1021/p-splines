@@ -4,13 +4,13 @@ import numpy as np
 run_idatas = True
 replace_idatas = False
 idatas_workers = 8
-run_reports = True
+run_reports = False
 replace_reports = False
 reports_workers = 50
 run_replications_report = False
 replications_report_workers = 100
 
-run_name = '7 ortho diag (f3, 0.33) 0'
+run_name = '7 ortho diag (f3, 0.33) 1'
 ###
 
 # f, sigma
