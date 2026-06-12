@@ -150,7 +150,7 @@ def main():
         general_summary = {
             "n_replications": [len(key_replications)],
             "sampling_time_rmean": [np.mean(sampling_times)],
-            "sampling_time_rmedian": [np.median(sampling_times)],
+            "sampling_time_rsd": [np.std(sampling_times)],
             "portion_divergent": [np.mean(np.array(divergences)>0)],
             "total_divergences": [np.sum(divergences)]
         }
@@ -255,6 +255,7 @@ def main():
 
                         'f (summary) umean_r_hat>1.01_rmean': [],
                         'sampling_time_rmean': [],
+                        'sampling_time_rsd': [],
                         'n_replications': [],
                         'portion_divergent': []}
         for i, row in unique_keys.iterrows():
@@ -299,6 +300,7 @@ def main():
 
                 ### general
                 task_summary_df['sampling_time_rmean'].append(general_summary['sampling_time_rmean'].values[0])
+                task_summary_df['sampling_time_rsd'].append(general_summary['sampling_time_rsd'].values[0])
                 task_summary_df['n_replications'].append(general_summary['n_replications'].values[0])
                 task_summary_df['portion_divergent'].append(general_summary['portion_divergent'].values[0])
         html_parts.append(f"<h2>f={f}, sigma={sigma}, builder={builder}</h2>")

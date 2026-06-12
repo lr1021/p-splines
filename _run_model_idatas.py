@@ -100,15 +100,11 @@ def worker(task):
             row.to_csv(timings_path, index=False)
 
 # Create tasks list
+np.random.seed(42)  # for reproducibility
 tasks = list(model_keys)
 tasks_df = pd.DataFrame(tasks, columns=['f', 'sigma', 'implementation', 'penalised', 'replication', 'builder'])
 tasks_df = stratified_shuffle(tasks_df, ['f', 'sigma', 'implementation', 'penalised'], ['replication'], random_state=42)
 tasks = list(tasks_df.itertuples(index=False, name=None))
-print(tasks_df.head(20))
-sys.exit(0)
-np.random.seed(42)  # for reproducibility
-#np.random.seed(41)
-np.random.shuffle(tasks)
 #tasks = tasks[300:]
 
 # Number of workers (adjust based on your server)
