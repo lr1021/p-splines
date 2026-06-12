@@ -46,6 +46,7 @@ def init_worker(csv_l, net_cdf_l):
 
 
 def worker(task):
+    global first_sample
     #print(task, ' idata')
     (f, sigma, implementation, penalised, replication, builder) = task
     idata_path = os.path.join(idatas_path, f"idata_{f}_{sigma}_{implementation}_{penalised}_{replication}({builder}).nc")
@@ -60,6 +61,34 @@ def worker(task):
         model, _, _, _ = builder_dict[builder](x_data, y_data, a, b,
                             spline_degree, n_internal_knots,
                             implementation, penalised, order)
+        
+        model_data = data[(f, sigma)][replication]
+        x_data = model_data[0]
+        y_data = model_data[1]
+        model, _, _, _ = builder_dict[builder](x_data, y_data, a, b,
+                            spline_degree, n_internal_knots,
+                            implementation, penalised, order)
+        # first sample
+        with model:
+            try:
+                s0 = time.time()
+                idata = pm.sample(tune = 1,
+                                draws = 1,
+                                chains = n_chains,
+                                random_seed=42,
+                                cores = n_cores,
+                                nuts_sampler="nutpie",
+                                store_divergences=True,
+                                discard_tuned_samples=True,
+                                progressbar=False,
+                                quiet=True)
+                s1 = time.time()
+                #print(f"first sample time: {s1 - s0:.2f} seconds")
+                del idata
+            except Exception as e:
+                print(f"Error in first sampling task {task}: {e}")
+        gc.collect()
+
         with model:
             try:
                 s0 = time.time()
@@ -75,7 +104,6 @@ def worker(task):
                 s1 = time.time()
             except Exception as e:
                 print(f"Error in sampling for task {task}: {e}")
-                #sys.exit(1)
                 return
         with net_cdf_lock:
             idata.to_netcdf(idata_path)
@@ -115,9 +143,13 @@ if __name__ == "__main__":
     net_cdf_l = Lock()
 
     if run_idatas:
+        print("Running idatas")
         try:
             with Pool(N_WORKERS, initializer=init_worker,initargs=(csv_l, net_cdf_l), maxtasksperchild=1) as p:
-                p.map(worker, tasks)
+                # chunksize=1 renews worker after each task, prevents sampler cache problems,
+                # to not count structure building as part of sampling I run
+                # a first void sample for each task
+                p.map(worker, tasks, chunksize=1)
         except KeyboardInterrupt:
             print("Keyboard interrupt received, terminating workers.")
             p.terminate()

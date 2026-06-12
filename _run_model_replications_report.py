@@ -40,7 +40,11 @@ def replication_compute(model_key):
     # sampling times
     sampling_time = extract_sampling_time(model_key, idatas_path)
     # divergences
-    n_divergences = int(idata.sample_stats["diverging"].sum())
+    try:
+        n_divergences = int(idata.sample_stats["diverging"].sum())
+    except Exception as e:
+        print(f"Error extracting divergences for model_key {model_key}: {e}")
+        n_divergences = 0
 
     # posterior summaries
     # 'mean', 'sd', 'hdi_3%', 'hdi_97%', 'mcse_mean', 'mcse_sd', 'ess_bulk', 'ess_tail', 'r_hat'
@@ -81,8 +85,8 @@ def replication_compute(model_key):
 
 
 # Summary
-def main():
-    model_keys_df = pd.DataFrame(model_keys, columns=['f', 'sigma', 'implementation', 'penalised', 'replication', 'builder'])
+def main(model_keys_df):
+    #model_keys_df = pd.DataFrame(mk, columns=['f', 'sigma', 'implementation', 'penalised', 'replication', 'builder'])
     # summary data across replications
     unique_keys = model_keys_df.drop(columns='replication').drop_duplicates()
     unique_keys.sort_values(['f', 'sigma', 'penalised', 'builder', 'implementation'], inplace=True)
@@ -230,6 +234,20 @@ def main():
         f, sigma, builder = task
         task_summary_df = {'Penalised': [],
                         'Implementation': [],
+                        
+                        'f (summary) umean_ess_bulk_rmean': [],
+                        'f (summary) umean_ess_bulk_rsd': [],
+                        'f (summary) umean_ess_bulk/s_rmean': [],
+                        'f (summary) umean_ess_bulk/s_rsd': [],
+
+                        'f (summary) umean_ess_tail_rmean': [],
+                        'f (summary) umean_ess_tail_rsd': [],
+                        'f (summary) umean_ess_tail/s_rmean': [],
+                        'f (summary) umean_ess_tail/s_rsd': [],
+
+                        'f (summary) umean_r_hat>1.01_rmean': [],
+                        
+                        'Implementation_': [],
 
                         'w (summary) umean_ess_bulk/s_rmean': [],
                         'w (summary) umean_ess_bulk/s_rsd': [],
@@ -243,17 +261,6 @@ def main():
 
                         'w (summary) umean_r_hat>1.01_rmean': [],
 
-                        'f (summary) umean_ess_bulk/s_rmean': [],
-                        'f (summary) umean_ess_bulk/s_rsd': [],
-                        'f (summary) umean_ess_bulk_rmean': [],
-                        'f (summary) umean_ess_bulk_rsd': [],
-
-                        'f (summary) umean_ess_tail/s_rmean': [],
-                        'f (summary) umean_ess_tail/s_rsd': [],
-                        'f (summary) umean_ess_tail_rmean': [],
-                        'f (summary) umean_ess_tail_rsd': [],
-
-                        'f (summary) umean_r_hat>1.01_rmean': [],
                         'sampling_time_rmean': [],
                         'sampling_time_rsd': [],
                         'n_replications': [],
@@ -262,6 +269,7 @@ def main():
             if row['f'] == f and row['sigma'] == sigma and row['builder'] == builder:
                 task_summary_df['Penalised'].append(row['penalised'])
                 task_summary_df['Implementation'].append(row['implementation'])
+                task_summary_df['Implementation_'].append(row['implementation'])
 
                 variables = row['variables'][0]
                 replication_summary = row['replication summary'][0]
@@ -305,7 +313,7 @@ def main():
                 task_summary_df['portion_divergent'].append(general_summary['portion_divergent'].values[0])
         html_parts.append(f"<h2>f={f}, sigma={sigma}, builder={builder}</h2>")
         task_summary_df = pd.DataFrame(task_summary_df)
-        task_summary_df.sort_values(['Penalised', 'f (summary) umean_ess_bulk/s_rmean'], ascending=[True, False], inplace=True)
+        task_summary_df.sort_values(['Penalised', 'f (summary) umean_ess_bulk_rmean'], ascending=[True, False], inplace=True)
         html_parts.append(pd.DataFrame(task_summary_df).to_html(index=False))
 
     s2 = time.time()
@@ -323,8 +331,19 @@ def main():
     print(f"Full report generated in {s3 - s2:.2f} seconds>.")
 
     html_parts.append("</body></html>")
-    with open(os.path.join(reports_path, "../replication_summary_report.html"), "w") as f:
-        f.write("\n".join(html_parts))
+    with open(os.path.join(reports_path, f"../replication_report({f}_{sigma}_{penalised}_{builder}).html"), "w") as o:
+        o.write("\n".join(html_parts))
 
 if __name__ == "__main__":
-    main()
+    model_keys_df = pd.DataFrame(model_keys, columns=['f', 'sigma', 'implementation', 'penalised', 'replication', 'builder'])
+    model_keys_df_f_sigma_penalised_builder = model_keys_df.drop(columns=['implementation', 'replication']).drop_duplicates()
+    model_keys_df_f_sigma_penalised_builder.sort_values(['f', 'sigma', 'penalised', 'builder'], inplace=True)
+    for i, row in model_keys_df_f_sigma_penalised_builder.iterrows():
+        f, sigma, penalised, builder = row
+        print(f"Processing f={f}, sigma={sigma}, penalised={penalised}, builder={builder}...")
+        main(model_keys_df[
+            (model_keys_df['f'] == f) &
+            (model_keys_df['sigma'] == sigma) &
+            (model_keys_df['penalised'] == penalised) &
+            (model_keys_df['builder'] == builder)
+        ])

@@ -3,7 +3,7 @@ import pickle
 from multiprocessing import Pool
 
 from _utils_reports import html_report
-from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functions, model_keys, directory_path, data_path, reports_path, idatas_path, builder, reports_workers, replace_reports
+from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functions, report_model_keys, directory_path, data_path, reports_path, idatas_path, builder, reports_workers, replace_reports
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -33,7 +33,7 @@ def worker(task):
     html_report(task, **html_report_args, replace_existing=replace_reports)
 
 # Create tasks list
-tasks = list(model_keys)
+tasks = list(report_model_keys)
 np.random.seed(42)
 np.random.shuffle(tasks)
 
