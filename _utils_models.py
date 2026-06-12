@@ -611,12 +611,11 @@ def build_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal_knots
         sigma_2 = pm.InverseGamma('sigma_2', alpha=a, beta=b)
 
         var_names = ['beta_0', 'sigma_2', 'tau']
-        if not penalised:
-            tau = pm.Gamma("tau", alpha=a, beta=b)+1e-8#, initval=1.0)
-            #tau = pm.Deterministic("tau", pt.as_tensor_variable(1.0))
-        else:
-            tau = pm.Gamma("tau", alpha=a, beta=b)+1e-8#, initval=1.0)
-            tau_p = pm.Gamma("tau_p", alpha=a, beta=b)#, initval=1.0)
+
+        tau = pm.Gamma("tau", alpha=a, beta=b)+1e-8#, initval=1.0)
+        #tau = pm.Deterministic("tau", pt.as_tensor_variable(1.0))
+        if penalised:
+            tau_p = pm.Gamma("tau_p", alpha=a, beta=b)+1e-8#, initval=1.0)
             #tau_p = pm.Deterministic("tau_p", pt.as_tensor_variable(1.0))
             var_names += ['tau_p']
 
