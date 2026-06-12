@@ -8,6 +8,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 import gc
 import sys
 import signal
+import itertools
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,7 +20,7 @@ from multiprocessing import Pool, Lock
 import time
 import xarray as xr
 
-from _utils_models import builder_dict
+from _utils_models import builder_dict, stratified_shuffle
 from _utils_reports import extract_sampling_time, write_idata_path, write_idata_path, extract_w_post
 from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functions, model_keys, directory_path, data_path, reports_path, idatas_path, builder, idatas_workers, run_idatas, run_reports, run_replications_report, replace_idatas
 
@@ -100,6 +101,11 @@ def worker(task):
 
 # Create tasks list
 tasks = list(model_keys)
+tasks_df = pd.DataFrame(tasks, columns=['f', 'sigma', 'implementation', 'penalised', 'replication', 'builder'])
+tasks_df = stratified_shuffle(tasks_df, ['f', 'sigma', 'implementation', 'penalised'], ['replication'], random_state=42)
+tasks = list(tasks_df.itertuples(index=False, name=None))
+print(tasks_df.head(20))
+sys.exit(0)
 np.random.seed(42)  # for reproducibility
 #np.random.seed(41)
 np.random.shuffle(tasks)

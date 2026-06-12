@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
 from scipy.linalg import null_space
@@ -7,6 +8,27 @@ from _utils_spline import eval_spline_basis_equispaced_numeric, difference_matri
 import warnings
 warnings.filterwarnings('ignore')
 
+def stratified_shuffle(df, stratify_cols, random_cols, random_state=None):
+    df = df.sort_values(stratify_cols+random_cols).reset_index(drop=True)
+    
+    unique_r = df[random_cols].drop_duplicates()
+    n_unique_r = len(unique_r)
+    unique_g = df[stratify_cols].drop_duplicates()
+    n_unique_g = len(unique_g)
+
+    new_df = pd.DataFrame()
+    for g in range(n_unique_g):
+        new_df = pd.concat([new_df, df[g*n_unique_r:(g+1)*n_unique_r].sample(frac=1).reset_index(drop=True)], ignore_index=True)
+    df = new_df
+    new_df = pd.DataFrame()
+    for r in range(n_unique_r):
+        new_df = pd.concat([new_df, df[r::n_unique_r]], ignore_index=True)
+    df = new_df
+    new_df = pd.DataFrame()
+    for r in range(n_unique_r):
+        new_df = pd.concat([new_df, df[r*n_unique_g:(r+1)*n_unique_g].sample(frac=1).reset_index(drop=True)], ignore_index=True)
+    df = new_df
+    return df
 
 def build_model(x_data, y_data, a, b, spline_degree, n_internal_knots, implementation, penalised, order):
     model = pm.Model()
