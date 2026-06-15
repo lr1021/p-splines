@@ -914,8 +914,8 @@ def build_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal_knots
                         col = col - (col0.T@col/np.linalg.norm(col0)**2)*col0
                         col_plot = col_plot - (col0.T@col/np.linalg.norm(col0)**2)*col0_plot
 
-                        X0[:, c] = col
-                        X0_plot[:, c] = col_plot
+                    X0[:, c] = col
+                    X0_plot[:, c] = col_plot
 
                 X0_ortho = X0.copy()
                 X0 = X0[:, 1:]

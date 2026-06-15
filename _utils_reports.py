@@ -168,15 +168,20 @@ def html_report(model_key, reports_path, idatas_path, functions,
         #w_post = np.hstack([wp_post, w0_post])
 
     _, w_post_flat = extract_w_post(idata)
+    beta_0_var = [v for v in idata.posterior.data_vars if v.startswith("beta_0")][0]
+    b_post = idata.posterior["beta_0"].values.flatten()
 
     X = X[x_data_order, :]
     f_post = X @ w_post_flat.T
+    f_post += b_post
     f_mean = np.mean(f_post, axis=1)
     f_median = np.median(f_post, axis=1)
     f_975 = np.percentile(f_post, 97.5, axis=1)
     f_025 = np.percentile(f_post, 2.5, axis=1)
 
-    f_plot_post = X_plot @ w_post_flat.T
+    f_plot_post = X @ w_post_flat.T
+    x_plot = x_data[x_data_order]
+    f_plot_post += b_post
     f_plot_mean = np.mean(f_plot_post, axis=1)
     f_plot_median = np.median(f_plot_post, axis=1)
     f_plot_975 = np.percentile(f_plot_post, 97.5, axis=1)
@@ -187,7 +192,8 @@ def html_report(model_key, reports_path, idatas_path, functions,
     #ax.plot(x_data[x_data_order], f_mean, label='Posterior Mean data', color='red', linestyle='dashed')
     ax.plot(x_plot, f_plot_mean, label='Posterior Mean plot', color='red')
     ax.plot(x_plot, f_plot_median, label='Posterior Median', color='orange', linestyle='dashed')
-    ax.plot(x_plot, functions[f](x_plot) - np.mean(functions[f](x_plot)), label='True Function', color='green')
+    #ax.plot(x_plot, functions[f](x_plot) - np.mean(functions[f](x_plot)), label='True Function', color='green')
+    ax.plot(x_plot, functions[f](x_plot), label='True Function', color='green')
     ax.fill_between(x_plot, f_plot_025, f_plot_975, color='red', alpha=0.3, label='95% Credible Interval')
     ax.set_title(f"Spline Fit: {model_key}")
     ax.legend()
