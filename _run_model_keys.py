@@ -10,16 +10,18 @@ reports_workers = 50
 run_replications_report = True
 replications_report_workers = 100
 
-run_name = '7 ortho diag (all, nop p)'
+run_name = '7 ortho diag (all, nop p) _ _ 12'
 ###
 
 # f, sigma
 f_sigma_list = [('f1', 0.33), ('f1', 0.5), ('f1', 1.0),
                 ('f2', 0.33), ('f2', 0.5), ('f2', 1.0),
                 ('f3', 0.33), ('f3', 0.5), ('f3', 1.0)]
+
+f_sigma_list = [('f1', 1.0)]
 # replication
-replication_list = list(range(100))[:]
-report_replication_list = [0]
+replication_list = [12]#list(range(100))[:]
+report_replication_list = replication_list# list(range(100))[:]
 # implementation
 #implementation_list = ['conditioning', 'ortho_conditioning']#['post_centring', 'ortho_post_centring', 'centring', 'ortho_centring', 'centring+dropping', 'ortho_centring+dropping']#, 'centring+dropping', 'conditioning', 'spectral', 'svd']
 implementation_list = ['post_centring', 'ortho_post_centring',
@@ -27,20 +29,28 @@ implementation_list = ['post_centring', 'ortho_post_centring',
                        'centring+dropping', 'ortho_centring+dropping',
                        'conditioning', 'ortho_conditioning',
                        'svd',
-                       'spectral'][:]
-# implementation_list = ['conditioning']
+                       'spectral',
+                       'ortho_spectral'][:]
+#implementation_list = ['post_centring']
 # implementation_list = ['ortho_conditioning']
 #implementation_list = ['post_centring', 'ortho_post_centring']
 # 0, MvN, ortho_diag
 builder_list = ['ortho_diag']
 # penalised
 penalised_list = [True, False]
+penalised_list = [True]
+
 
 a = 1
 b = 0.005
 order = 2
 spline_degree = 3
 n_internal_knots = 20
+
+n_tune = 2000
+n_draws = 4000
+n_chains = 4
+n_cores = 4
 
 model_keys = []
 for f, sigma in f_sigma_list:
@@ -58,7 +68,7 @@ for f, sigma in f_sigma_list:
         for implementation in implementation_list:
             for builder in builder_list:
                 for penalised in penalised_list:
-                    if (implementation=='spectral')&(not penalised):
+                    if ('spectral' in implementation)&(not penalised):
                         continue
                     report_model_keys.append((f, sigma, implementation, penalised, replication, builder))
 

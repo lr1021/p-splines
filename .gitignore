@@ -4,3 +4,4 @@ __pycache__/
 idata*/
 reports*/
 run*/
+*archive*/

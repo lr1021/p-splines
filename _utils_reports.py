@@ -47,8 +47,12 @@ def extract_sampling_time(model_key, idatas_path):
     & (timings_df["replication"] == replication),
     "runtime_seconds",
     ]
-    sampling_time = np.mean(match) if not match.empty else np.nan
-    #sampling_time = idata.sample_stats.attrs["sampling_time"]
+    if not match.empty:
+        sampling_time = np.mean(match)
+    else:
+        print(f"Warning: No timing found for model_key {model_key} in timings.csv. Setting sampling_time to NaN.")
+        sampling_time = np.nan
+        #sampling_time = idata.sample_stats.attrs["sampling_time"]
     return sampling_time
 
 def html_report(model_key, reports_path, idatas_path, functions,

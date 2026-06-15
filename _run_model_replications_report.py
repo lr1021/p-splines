@@ -35,7 +35,11 @@ def replication_compute(model_key):
     model, X, X_plot, var_names = builder_dict[builder](x_data, y_data, a, b,
                         spline_degree, n_internal_knots,
                         implementation, penalised, order)
-    idata = az.from_netcdf(write_idata_path(model_key, idatas_path))
+    try:
+        idata = az.from_netcdf(write_idata_path(model_key, idatas_path))
+    except Exception as e:
+        print(f"Error loading idata for model_key {model_key}: {e}")
+        return None, None, None, None, None
 
     # sampling times
     sampling_time = extract_sampling_time(model_key, idatas_path)
@@ -85,7 +89,7 @@ def replication_compute(model_key):
 
 
 # Summary
-def main(model_keys_df):
+def main_iter(model_keys_df):
     #model_keys_df = pd.DataFrame(mk, columns=['f', 'sigma', 'implementation', 'penalised', 'replication', 'builder'])
     # summary data across replications
     unique_keys = model_keys_df.drop(columns='replication').drop_duplicates()
@@ -334,16 +338,18 @@ def main(model_keys_df):
     with open(os.path.join(reports_path, f"../replication_report({f}_{sigma}_{penalised}_{builder}).html"), "w") as o:
         o.write("\n".join(html_parts))
 
-if __name__ == "__main__":
+def main():
     model_keys_df = pd.DataFrame(model_keys, columns=['f', 'sigma', 'implementation', 'penalised', 'replication', 'builder'])
     model_keys_df_f_sigma_penalised_builder = model_keys_df.drop(columns=['implementation', 'replication']).drop_duplicates()
     model_keys_df_f_sigma_penalised_builder.sort_values(['f', 'sigma', 'penalised', 'builder'], inplace=True)
     for i, row in model_keys_df_f_sigma_penalised_builder.iterrows():
         f, sigma, penalised, builder = row
         print(f"Processing f={f}, sigma={sigma}, penalised={penalised}, builder={builder}...")
-        main(model_keys_df[
+        main_iter(model_keys_df[
             (model_keys_df['f'] == f) &
             (model_keys_df['sigma'] == sigma) &
             (model_keys_df['penalised'] == penalised) &
             (model_keys_df['builder'] == builder)
         ])
+if __name__ == "__main__":
+    main()

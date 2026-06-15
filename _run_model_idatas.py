@@ -22,15 +22,10 @@ import xarray as xr
 
 from _utils_models import builder_dict, stratified_shuffle
 from _utils_reports import extract_sampling_time, write_idata_path, write_idata_path, extract_w_post
-from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functions, model_keys, directory_path, data_path, reports_path, idatas_path, builder, idatas_workers, run_idatas, run_reports, run_replications_report, replace_idatas
+from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functions, model_keys, directory_path, data_path, reports_path, idatas_path, builder, idatas_workers, run_idatas, run_reports, run_replications_report, replace_idatas, n_tune, n_draws, n_chains, n_cores
 
 import warnings
 warnings.filterwarnings('ignore')
-
-n_tune = 1000
-n_draws = 1000
-n_chains = 4
-n_cores = 4
 
 ######################
 with open(data_path, "rb") as data_file:
