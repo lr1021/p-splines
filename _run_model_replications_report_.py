@@ -13,8 +13,7 @@ import xarray as xr
 
 from _utils_models import builder_dict
 from _utils_reports import extract_sampling_time, write_idata_path, write_idata_path, extract_w_post
-from _run_generate_data import data_path
-from _run_model_keys._run_model_keys import a, b, order, spline_degree, n_internal_knots, model_keys, directory_path, reports_path, idatas_path, builder, replications_report_workers
+from _run_model_keys._run_model_keys import a, b, order, spline_degree, n_internal_knots, model_keys, directory_path, data_path, reports_path, idatas_path, builder, replications_report_workers
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -114,179 +113,188 @@ def replication_compute(model_key):
 
 # Summary
 def main_iter(model_keys_df):
-    unique_keys_folder = os.path.join(reports_path, f"../replication_reports/unique_keys")
-    os.makedirs(unique_keys_folder, exist_ok=True)
-    ###
-    key_cols = ['f', 'sigma', 'penalised', 'builder', 'implementation']
-    f, sigma, penalised, builder = model_keys_df.iloc[0][['f', 'sigma', 'penalised', 'builder']]
-    unique_keys_path = os.path.join(unique_keys_folder, f"unique_keys_{f}_{sigma}_{penalised}_{builder}.pkl")
+    #model_keys_df = pd.DataFrame(mk, columns=['f', 'sigma', 'implementation', 'penalised', 'replication', 'builder'])
+    # summary data across replications
+    unique_keys = model_keys_df.drop(columns='replication').drop_duplicates()
+    unique_keys.sort_values(['f', 'sigma', 'penalised', 'builder', 'implementation'], inplace=True)
+    unique_keys.reset_index(drop=True, inplace=True)
+    unique_keys['parts'] = [[] for _ in range(len(unique_keys))]
 
-    # current desired rows
-    unique_keys = (
-        model_keys_df
-        .drop(columns='replication')
-        .drop_duplicates()
-        .sort_values(key_cols)
-        .reset_index(drop=True)
-    )
-    # initialize empty columns
-    value_cols = [
-        'parts',
-        'general summary',
-        'variables',
-        'summaries',
-        'replication summary',
-        'f summary',
-    ]
-    for col in value_cols:
-        unique_keys[col] = [[] for _ in range(len(unique_keys))]
-    if os.path.exists(unique_keys_path):
-        print("Reading existing unique_keys")
-        old = pd.read_pickle(unique_keys_path)
-
-        unique_keys = unique_keys.merge(
-            old[key_cols + value_cols],
-            on=key_cols,
-            how='left',
-            suffixes=('', '_old')
-        )
-        for col in value_cols:
-            unique_keys[col] = unique_keys[f'{col}_old'].combine_first(unique_keys[col])
-            unique_keys.drop(columns=f'{col}_old', inplace=True)
-        ###
+    unique_keys['general summary'] = [[] for _ in range(len(unique_keys))]
+    unique_keys['variables'] = [[] for _ in range(len(unique_keys))]
+    unique_keys['summaries'] = [[] for _ in range(len(unique_keys))]
+    unique_keys['replication summary'] = [[] for _ in range(len(unique_keys))]
+    unique_keys['f summary'] = [[] for _ in range(len(unique_keys))]
 
     s0 = time.time()
 
     for i, row in unique_keys.iterrows():
-        if unique_keys.at[i, 'parts']:
-            continue  # Skip if parts already exist
         f, sigma, implementation, penalised, builder, _, _, _, _, _, _ = row
 
+        p_ = os.path.join(reports_path, f"../replication_reports/replication_report({f}_{sigma}_{penalised}_{builder})")
+        os.makedirs(p_, exist_ok=True)
+        general_summary_path = os.path.join(p_, "general_summary.csv")
+        replication_summary_path = os.path.join(p_, "replication_summary.csv")
+        f_summary_path = os.path.join(p_, "f_summary.csv")
 
-        key_replications = model_keys_df[
-            (model_keys_df['f'] == f) &
-            (model_keys_df['sigma'] == sigma) &
-            (model_keys_df['implementation'] == implementation) &
-            (model_keys_df['penalised'] == penalised) &
-            (model_keys_df['builder'] == builder)
-        ]['replication'].tolist()
+        # read variables
+        model_key = (f, sigma, implementation, penalised, 0, builder)
+        try:
+            idata = az.from_netcdf(write_idata_path(model_key, idatas_path))
+            variables_list = az.summary(idata).index.tolist()
+        except Exception as e:
+            print(f"Error loading idata for model_key {model_key}: {e}")
 
-        variables_list = []
-        sampling_times = [] # take mean and median
-        divergences = [] # mean and median and max
-        draws = []
-        summaries = [] # mean of summary stats (ess_bulk, ess_tail, r_hat, etc.) + min ess + max rhat
-        f_metrics = {
-            "umin_ess_bulk": [],
-            "up5_ess_bulk": [],
-            "umean_ess_bulk": [],
+        if not os.path.exists(general_summary_path) or not os.path.exists(replication_summary_path) or not os.path.exists(f_summary_path):
 
-            "umin_ess_bulk/s": [],
-            "up5_ess_bulk/s": [],
-            "umean_ess_bulk/s": [],
+            key_replications = model_keys_df[
+                (model_keys_df['f'] == f) &
+                (model_keys_df['sigma'] == sigma) &
+                (model_keys_df['implementation'] == implementation) &
+                (model_keys_df['penalised'] == penalised) &
+                (model_keys_df['builder'] == builder)
+            ]['replication'].tolist()
 
-            "umin_ess_tail": [],
-            "up5_ess_tail": [],
-            "umean_ess_tail": [],
+            variables_list = []
+            sampling_times = [] # take mean and median
+            divergences = [] # mean and median and max
+            draws = []
+            summaries = [] # mean of summary stats (ess_bulk, ess_tail, r_hat, etc.) + min ess + max rhat
+            f_metrics = {
+                "umin_ess_bulk": [],
+                "up5_ess_bulk": [],
+                "umean_ess_bulk": [],
 
-            "umin_ess_tail/s": [],
-            "up5_ess_tail/s": [],
-            "umean_ess_tail/s": [],
+                "umin_ess_bulk/s": [],
+                "up5_ess_bulk/s": [],
+                "umean_ess_bulk/s": [],
 
-            "umax_r_hat": [],
-            "umean_r_hat>=1.01": [],
-            "uany_r_hat>=1.01": []}
-        
-        model_keys_rep = [(f, sigma, implementation, penalised, replication, builder) 
-                    for replication in key_replications]
-        with Pool(processes=int(min(len(key_replications), replications_report_workers))) as pool:
-            results = pool.map(replication_compute, model_keys_rep)
-        for sampling_time, n_divergences, n_samples, summary_array, variables, f_m in results:
-            sampling_times.append(sampling_time)
-            divergences.append(n_divergences)
-            draws.append(n_samples)
-            summaries.append(summary_array)
-            variables_list.append(variables)
+                "umin_ess_tail": [],
+                "up5_ess_tail": [],
+                "umean_ess_tail": [],
 
+                "umin_ess_tail/s": [],
+                "up5_ess_tail/s": [],
+                "umean_ess_tail/s": [],
+
+                "umax_r_hat": [],
+                "umean_r_hat>=1.01": [],
+                "uany_r_hat>=1.01": []}
+            
+            model_keys_rep = [(f, sigma, implementation, penalised, replication, builder) 
+                        for replication in key_replications]
+            with Pool(processes=int(min(len(key_replications), replications_report_workers))) as pool:
+                results = pool.map(replication_compute, model_keys_rep)
+            for sampling_time, n_divergences, n_samples, summary_array, variables, f_m in results:
+                sampling_times.append(sampling_time)
+                divergences.append(n_divergences)
+                draws.append(n_samples)
+                summaries.append(summary_array)
+                variables_list.append(variables)
+
+                for key in f_metrics:
+                    f_metrics[key].append(f_m[key])
+
+            summaries = np.stack(summaries, axis=0)
+
+            ###
+            general_summary = {
+                "n_replications": [len(key_replications)],
+                "sampling_time_rmean": [np.mean(sampling_times)],
+                "sampling_time_rsd": [np.std(sampling_times)],
+                "div>0_rmean": [np.mean(np.array(divergences)>0)],
+                "div/samples_rmean": [np.mean(np.array(divergences)/np.array(draws))],
+                "div>1%samples_rmean": [np.mean(np.array(divergences)/np.array(draws) > 0.01)],
+                "total_divergences": [np.sum(divergences)]
+            }
+            general_summary_round = {
+                "sampling_time_rmean": 3,
+                "sampling_time_rsd": 3
+            }
+            unique_keys.at[i, 'general summary'].append(pd.DataFrame(general_summary))
+            unique_keys.at[i, 'parts'].append('<h2>General Summary</h2>')
+            general_summary_df = pd.DataFrame(general_summary)
+
+
+            general_summary_df.to_csv(general_summary_path, index=False)
+
+            general_summary_df = general_summary_df.round(general_summary_round)
+            unique_keys.at[i, 'parts'].append(general_summary_df.to_html(index=False))
+            ###
+
+            ###
+            replication_summary = pd.DataFrame()
+            replication_summary['variable'] = variables_list[0]
+
+            replication_summary['ess_bulk_rmean'] = summaries[:, :, 6].mean(axis=0).round(2)
+            replication_summary['ess_bulk/s_rmean'] = summaries[:, :, -2].mean(axis=0).round(2)
+            #replication_summary['sd_ess_bulk'] = summaries[:, :, 6].std(axis=0)
+            #replication_summary['sd_ess_bulk/s'] = summaries[:, :, -2].std(axis=0)
+            #replication_summary['min_ess_bulk/s'] = summaries[:, :, 6].min(axis=0)
+            replication_summary['ess_tail_rmean'] = summaries[:, :, 7].mean(axis=0).round(2)
+            replication_summary['ess_tail/s_rmean'] = summaries[:, :, -1].mean(axis=0).round(2)
+            #replication_summary['sd_ess_tail'] = summaries[:, :, 7].std(axis=0)
+            #replication_summary['sd_ess_tail/s'] = summaries[:, :, -1].std(axis=0)
+            #replication_summary['min_ess_tail/s'] = summaries[:, :, 7].min(axis=0)
+
+            replication_summary['r_hat_rmean'] = summaries[:, :, 8].mean(axis=0)
+            replication_summary['r_hat>=1.01_rmean'] = (summaries[:, :, 8] >= 1.01).mean(axis=0)
+
+            replication_summary['sd_rmean'] = summaries[:, :, 1].mean(axis=0)
+            replication_summary['hdi_range_rmean'] = (summaries[:, :, 3] - summaries[:, :, 2]).mean(axis=0).round(2)
+
+            replication_summary['mcse_mean_rmean'] = summaries[:, :, 4].mean(axis=0)
+            replication_summary['mcse_sd_rmean'] = summaries[:, :, 5].mean(axis=0)
+
+            mean_w_row = replication_summary.loc[
+                [v.startswith('w') for v in replication_summary['variable']],
+                replication_summary.columns != 'variable'].mean()
+            
+            mean_w_row['variable'] = 'w (summary)'
+            mean_w_df = mean_w_row.to_frame().T
+            replication_summary = pd.concat([mean_w_df[
+            ['variable'] + [c for c in mean_w_df.columns if c != 'variable']],
+            replication_summary], ignore_index=True)
+
+            unique_keys.at[i, 'variables'].append(variables_list[0])
+            unique_keys.at[i, 'summaries'].append(summaries)
+            unique_keys.at[i, 'replication summary'].append(replication_summary)
+            unique_keys.at[i, 'parts'].append('<h2>Replication Summary</h2>')
+            unique_keys.at[i, 'parts'].append(replication_summary.to_html(index=False))
+
+            replication_summary.to_csv(replication_summary_path, index=False)
+            ###
+            f_summary = {k+"_rmean": [np.mean(v)] for k, v in f_metrics.items()}
             for key in f_metrics:
-                f_metrics[key].append(f_m[key])
+                if 'ess' in key:
+                    f_summary[key+"_rsd"] = [np.std(f_metrics[key])]
+            f_summary['umax_r_hat_rmax'] = [np.max(f_metrics['umax_r_hat'])]
+            f_summary_df = pd.DataFrame(f_summary)
+            unique_keys.at[i, 'f summary'].append(f_summary_df)
+            unique_keys.at[i, 'parts'].append('<h2>f Summary</h2>')
+            unique_keys.at[i, 'parts'].append(f_summary_df.to_html(index=False))
 
-        summaries = np.stack(summaries, axis=0)
+            f_summary_df.to_csv(f_summary_path, index=False)
+        else:
+            general_summary_df = pd.read_csv(general_summary_path)
+            replication_summary = pd.read_csv(replication_summary_path)
+            f_summary_df = pd.read_csv(f_summary_path)
 
-        ###
-        general_summary = {
-            "n_replications": [len(key_replications)],
-            "sampling_time_rmean": [np.mean(sampling_times)],
-            "sampling_time_rsd": [np.std(sampling_times)],
-            "div>0_rmean": [np.mean(np.array(divergences)>0)],
-            "div/samples_rmean": [np.mean(np.array(divergences)/np.array(draws))],
-            "div>1%samples_rmean": [np.mean(np.array(divergences)/np.array(draws) > 0.01)],
-            "total_divergences": [np.sum(divergences)]
-        }
-        general_summary_round = {
-            "sampling_time_rmean": 3,
-            "sampling_time_rsd": 3
-        }
-        unique_keys.at[i, 'general summary'].append(pd.DataFrame(general_summary))
-        unique_keys.at[i, 'parts'].append('<h2>General Summary</h2>')
-        general_summary_df = pd.DataFrame(general_summary)
+            unique_keys.at[i, 'variables'].append(variables_list[0])
+            # unique_keys.at[i, 'summaries'].append(summaries)
 
-        general_summary_df = general_summary_df.round(general_summary_round)
-        unique_keys.at[i, 'parts'].append(general_summary_df.to_html(index=False))
-        ###
+            unique_keys.at[i, 'general summary'].append(general_summary_df)
+            unique_keys.at[i, 'parts'].append('<h2>General Summary</h2>')
+            unique_keys.at[i, 'parts'].append(general_summary_df.to_html(index=False))
 
-        ###
-        replication_summary = pd.DataFrame()
-        replication_summary['variable'] = variables_list[0]
+            unique_keys.at[i, 'replication summary'].append(replication_summary)
+            unique_keys.at[i, 'parts'].append('<h2>Replication Summary</h2>')
+            unique_keys.at[i, 'parts'].append(replication_summary.to_html(index=False))
+            
+            unique_keys.at[i, 'f summary'].append(f_summary_df)
+            unique_keys.at[i, 'parts'].append('<h2>f Summary</h2>')
+            unique_keys.at[i, 'parts'].append(f_summary_df.to_html(index=False))
 
-        replication_summary['ess_bulk_rmean'] = summaries[:, :, 6].mean(axis=0).round(2)
-        replication_summary['ess_bulk/s_rmean'] = summaries[:, :, -2].mean(axis=0).round(2)
-        #replication_summary['sd_ess_bulk'] = summaries[:, :, 6].std(axis=0)
-        #replication_summary['sd_ess_bulk/s'] = summaries[:, :, -2].std(axis=0)
-        #replication_summary['min_ess_bulk/s'] = summaries[:, :, 6].min(axis=0)
-        replication_summary['ess_tail_rmean'] = summaries[:, :, 7].mean(axis=0).round(2)
-        replication_summary['ess_tail/s_rmean'] = summaries[:, :, -1].mean(axis=0).round(2)
-        #replication_summary['sd_ess_tail'] = summaries[:, :, 7].std(axis=0)
-        #replication_summary['sd_ess_tail/s'] = summaries[:, :, -1].std(axis=0)
-        #replication_summary['min_ess_tail/s'] = summaries[:, :, 7].min(axis=0)
-
-        replication_summary['r_hat_rmean'] = summaries[:, :, 8].mean(axis=0)
-        replication_summary['r_hat>=1.01_rmean'] = (summaries[:, :, 8] >= 1.01).mean(axis=0)
-
-        replication_summary['sd_rmean'] = summaries[:, :, 1].mean(axis=0)
-        replication_summary['hdi_range_rmean'] = (summaries[:, :, 3] - summaries[:, :, 2]).mean(axis=0).round(2)
-
-        replication_summary['mcse_mean_rmean'] = summaries[:, :, 4].mean(axis=0)
-        replication_summary['mcse_sd_rmean'] = summaries[:, :, 5].mean(axis=0)
-
-        mean_w_row = replication_summary.loc[
-            [v.startswith('w') for v in replication_summary['variable']],
-            replication_summary.columns != 'variable'].mean()
-        
-        mean_w_row['variable'] = 'w (summary)'
-        mean_w_df = mean_w_row.to_frame().T
-        replication_summary = pd.concat([mean_w_df[
-        ['variable'] + [c for c in mean_w_df.columns if c != 'variable']],
-        replication_summary], ignore_index=True)
-
-        unique_keys.at[i, 'variables'].append(variables_list[0])
-        unique_keys.at[i, 'summaries'].append(summaries)
-        unique_keys.at[i, 'replication summary'].append(replication_summary)
-        unique_keys.at[i, 'parts'].append('<h2>Replication Summary</h2>')
-        unique_keys.at[i, 'parts'].append(replication_summary.to_html(index=False))
-
-        ###
-        f_summary = {k+"_rmean": [np.mean(v)] for k, v in f_metrics.items()}
-        for key in f_metrics:
-            if 'ess' in key:
-                f_summary[key+"_rsd"] = [np.std(f_metrics[key])]
-        f_summary['umax_r_hat_rmax'] = [np.max(f_metrics['umax_r_hat'])]
-        f_summary_df = pd.DataFrame(f_summary)
-        unique_keys.at[i, 'f summary'].append(f_summary_df)
-        unique_keys.at[i, 'parts'].append('<h2>f Summary</h2>')
-        unique_keys.at[i, 'parts'].append(f_summary_df.to_html(index=False))
-
-    unique_keys.to_pickle(unique_keys_path)
     s1 = time.time()
     print(f"Summary report generated in {s1 - s0:.2f} seconds.")
 
@@ -306,18 +314,9 @@ def main_iter(model_keys_df):
     unique_keys_tasks = model_keys_df.drop(columns=['penalised', 'implementation', 'replication']).drop_duplicates()
     penalised = model_keys_df['penalised'].iloc[0]
     for i, task in unique_keys_tasks.iterrows():
-        f, sigma, builder = task
-
-        replication_report_folder = os.path.join(reports_path, "../replication_reports")
-        os.makedirs(replication_report_folder, exist_ok=True)
-        replication_report_path = os.path.join(replication_report_folder, f"replication_report({f}_{sigma}_{penalised}_{builder}).html")
-        if os.path.exists(replication_report_path):
-            print(f"Replication report for f={f}, sigma={sigma}, penalised={penalised}, builder={builder} already exists. Skipping...")
-            continue  # Skip if report already exists
-        
-        task_summary_folder = os.path.join(reports_path, "../replication_reports/task_summaries")
-        os.makedirs(task_summary_folder, exist_ok=True)
-        task_summary_path = os.path.join(task_summary_folder, f"task_summary({f}_{sigma}_{penalised}_{builder}).csv")
+        p_ = os.path.join(reports_path, f"../replication_reports/replication_report({f}_{sigma}_{penalised}_{builder})")
+        os.makedirs(p_, exist_ok=True)
+        task_summary_path = os.path.join(p_, "task_summary.csv")
         
         if not os.path.exists(task_summary_path):
             f, sigma, builder = task
@@ -372,6 +371,7 @@ def main_iter(model_keys_df):
                     variables = row['variables'][0]
                     replication_summary = row['replication summary'][0]
                     f_summary = row['f summary'][0]
+                
                     general_summary = row['general summary'][0]
                     ### u_w_r
                     summaries = row['summaries'][0]
@@ -463,7 +463,7 @@ def main_iter(model_keys_df):
     print(f"Full report generated in {s3 - s2:.2f} seconds>.")
 
     html_parts.append("</body></html>")
-    with open(replication_report_path, "w") as o:
+    with open(os.path.join(reports_path, f"../replication_reports/replication_report({f}_{sigma}_{penalised}_{builder}).html"), "w") as o:
         o.write("\n".join(html_parts))
 
 def main():

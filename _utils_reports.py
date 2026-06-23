@@ -1,4 +1,5 @@
 from re import match
+import re
 import numpy as np
 import matplotlib.pyplot as plt
 import arviz as az
@@ -168,6 +169,7 @@ def html_report(model_key, reports_path, idatas_path, functions,
         #w_post = np.hstack([wp_post, w0_post])
 
     _, w_post_flat = extract_w_post(idata)
+    #w_post_flat[:, :-1] = 0
     beta_0_var = [v for v in idata.posterior.data_vars if v.startswith("beta_0")][0]
     b_post = idata.posterior["beta_0"].values.flatten()
 
@@ -199,6 +201,11 @@ def html_report(model_key, reports_path, idatas_path, functions,
     ax.legend()
     img_base64 = fig_to_base64(fig)
     report_parts.append(f"<h2>Spline Fit</h2><img src='data:image/png;base64,{img_base64}' />")
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(x_plot, X[:, -1])
+    img_base64 = fig_to_base64(fig)
+    report_parts.append(f"<h2>Spline Basis</h2><img src='data:image/png;base64,{img_base64}' />")
 
     report_parts.append("</body></html>")
 

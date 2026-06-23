@@ -7,6 +7,14 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 import gc
 import sys
+
+import sys
+
+sys.path.insert(
+    0,
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
 import signal
 import itertools
 
@@ -22,7 +30,9 @@ import xarray as xr
 
 from _utils_models import builder_dict, stratified_shuffle
 from _utils_reports import extract_sampling_time, write_idata_path, write_idata_path, extract_w_post
-from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functions, model_keys, directory_path, data_path, reports_path, idatas_path, builder, idatas_workers, run_idatas, run_reports, run_replications_report, replace_idatas, n_tune, n_draws, n_chains, n_cores
+from _run_generate_data import data_path
+
+from _run_model_keys._run_model_keys import a, b, order, spline_degree, n_internal_knots, model_keys, directory_path, reports_path, idatas_path, builder, idatas_workers, run_idatas, run_reports, run_replications_report, replace_idatas, n_tune, n_draws, n_chains, n_cores, target_accept, max_treedepth, report_model_keys
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -42,12 +52,12 @@ def init_worker(csv_l, net_cdf_l):
 
 def worker(task):
     global first_sample
-    #print(task, ' idata')
+    print(task, ' idata')
     (f, sigma, implementation, penalised, replication, builder) = task
     idata_path = os.path.join(idatas_path, f"idata_{f}_{sigma}_{implementation}_{penalised}_{replication}({builder}).nc")
     if os.path.exists(idata_path) and not replace_idatas:
         pass
-        #print(task, ' idata exists')
+        print(task, ' idata exists')
         # idata = az.from_netcdf(idata_path)
     else:
         model_data = data[(f, sigma)][replication]
@@ -76,7 +86,9 @@ def worker(task):
                                 store_divergences=True,
                                 discard_tuned_samples=True,
                                 progressbar=False,
-                                quiet=True)
+                                quiet=True,
+                                target_accept=target_accept,
+                                max_treedepth=max_treedepth)
                 s1 = time.time()
                 #print(f"first sample time: {s1 - s0:.2f} seconds")
                 del idata
@@ -95,7 +107,9 @@ def worker(task):
                                 nuts_sampler="nutpie",
                                 store_divergences=True,
                                 discard_tuned_samples=True,
-                                progressbar=False)
+                                progressbar=False,
+                                target_accept=target_accept,
+                                max_treedepth=max_treedepth)
                 s1 = time.time()
             except Exception as e:
                 print(f"Error in sampling for task {task}: {e}")
@@ -116,11 +130,11 @@ def worker(task):
 
         # append or create csv
         timings_path = os.path.join(idatas_path, '../timings.csv')
-        if os.path.exists(timings_path):
-            with csv_lock:
-                row.to_csv(timings_path, mode="a", header=False, index=False)
-        else:
-            row.to_csv(timings_path, index=False)
+        with csv_lock:
+            if os.path.exists(timings_path):
+                    row.to_csv(timings_path, mode="a", header=False, index=False)
+            else:
+                row.to_csv(timings_path, index=False)
 
 # Create tasks list
 np.random.seed(42)  # for reproducibility

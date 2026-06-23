@@ -1,9 +1,17 @@
+import os
+import sys
+sys.path.insert(
+    0,
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
 import numpy as np
 import pickle
 from multiprocessing import Pool
 
 from _utils_reports import html_report
-from _run_model_keys import a, b, order, spline_degree, n_internal_knots, functions, report_model_keys, directory_path, data_path, reports_path, idatas_path, builder, reports_workers, replace_reports
+from _run_generate_data import functions, data_path
+from _run_model_keys._run_model_keys import a, b, order, spline_degree, n_internal_knots, report_model_keys, directory_path, reports_path, idatas_path, builder, reports_workers, replace_reports
 
 import warnings
 warnings.filterwarnings('ignore')
