@@ -1,5 +1,7 @@
+from importlib import import_module
 import os
 import sys
+
 sys.path.insert(
     0,
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,47 +12,46 @@ import pickle
 from multiprocessing import Pool
 
 from _utils_reports import html_report
-from _run_generate_data import functions, data_path
-from _run_model_keys._run_model_keys import a, b, order, spline_degree, n_internal_knots, report_model_keys, directory_path, reports_path, idatas_path, builder, reports_workers, replace_reports
+from _utils_functions import functions
 
 import warnings
 warnings.filterwarnings('ignore')
 
-######################
-with open(data_path, "rb") as data_file:
-        data = pickle.load(data_file)
-
-def init_worker():
-    """Initialize worker process"""
-    #implementation_var_names = {'standard': [['w']],
-             #'centring+dropping': [['w']],
-             #'conditioning': [['theta']],
-             #'spectral': [['w'], ['w0', 'wp']],
-             #'svd': [['w']]}
-    
-    
+# from _run_model_keys._run_model_keys import a, b, order, spline_degree, n_internal_knots, report_model_keys, data_path, directory_path, reports_path, idatas_path, builder, reports_workers, replace_reports
+def init_worker(k, d):
+    global keys, data
+    keys = k
+    data = d
 
 def worker(task):
-    # print(task, ' report')
-
-    html_report_args = {'reports_path': reports_path, 'idatas_path': idatas_path, 'functions': functions,
-                        'a': a, 'b': b,
-                        'order': order, 'spline_degree': spline_degree,
-                        'n_internal_knots': n_internal_knots, 'data': data}
+    global keys, data
+    print(task, ' report')
+    html_report_args = {'reports_path': keys.reports_path, 'idatas_path': keys.idatas_path, 'functions': functions,
+                        'a': keys.a, 'b': keys.b,
+                        'order': keys.order, 'spline_degree': keys.spline_degree,
+                        'n_internal_knots': keys.n_internal_knots, 'data': data}
     
-    html_report(task, **html_report_args, replace_existing=replace_reports)
+    html_report(task, **html_report_args, replace_existing=keys.replace_reports)
+######################
+def main(keys_path):
+    keys_loc = keys_path.replace('/', '.').removesuffix('.py')
+    keys = import_module(keys_loc)
+    
+    # print("Running reports")
+    with open(keys.data_path, "rb") as data_file:
+            data = pickle.load(data_file)
 
-# Create tasks list
-tasks = list(report_model_keys)
-np.random.seed(42)
-np.random.shuffle(tasks)
+    # Create tasks list
+    tasks = list(keys.report_model_keys)
+    np.random.seed(42)
+    np.random.shuffle(tasks)
 
-# Number of workers
-N_WORKERS = reports_workers
-def main():
-    with Pool(N_WORKERS, initializer=init_worker) as p:
+    # Number of workers
+    N_WORKERS = keys.reports_workers
+
+    with Pool(N_WORKERS, initializer=init_worker, initargs=(keys, data)) as p:
         results = p.map(worker, tasks)
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1])
 

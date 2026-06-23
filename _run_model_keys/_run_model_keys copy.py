@@ -4,16 +4,16 @@ import shutil
 
 copy_keys = True
 
-run_idatas = False
+run_idatas = True
 replace_idatas = False
 idatas_workers = 512
 
-run_reports = False
+run_reports = True
 replace_reports = False
 reports_workers = 100
 
 run_replications_report = True
-replace_replications_report = True
+replace_replications_report = False
 replications_report_workers = 100
 
 run_name = 'test1'
@@ -47,7 +47,7 @@ report_replication_list = replication_list[:2]
                        #'svd',
                        #'spectral',
                        #'ortho_spectral'][:]
-implementation_list = ['ortho_centring_T', 'ortho_centring_T_exact', 'svd', 'svd_aligned'][:]
+implementation_list = ['ortho_centring_T', 'ortho_centring_T_exact', 'svd', 'svd_aligned'][0:2]
 # implementation_list = ['centring+dropping', 'ortho_centring+dropping',
                        #'svd',
                        #'spectral', 'ortho_spectral'][:]
@@ -111,5 +111,51 @@ if copy_keys:
     destination = os.path.join(run_path, '_run_model_keys.py')
     if not os.path.exists(destination):
         shutil.copy2(current_script, destination)
+
+    idatas_script = '_run_model_idatas.py'
+    with open(idatas_script, 'r') as f:
+        text = f.read()
+
+    text = text.replace(
+        'from _run_model_keys._run_model_keys import',
+        f'from {run_folder_name}._run_model_keys import'
+    )
+    text = text.replace(
+        'from _run_generate_data import',
+        f'from {run_folder_name}._run_generate_data import'
+    )
     
+    destination = os.path.join(run_path, '_run_model_idatas.py')
+    if not os.path.exists(destination):
+        with open(destination, 'w') as f:
+            f.write(text)
+
+    generate_script = '_run_generate_data.py'
+    with open(generate_script, 'r') as f:
+        text = f.read()
+
+    text = text.replace(
+        'from _run_model_keys._run_model_keys import',
+        f'from {run_folder_name}._run_model_keys import'
+    )
+    destination = os.path.join(run_path, '_run_generate_data.py')
+    if not os.path.exists(destination):
+        with open(destination, 'w') as f:
+            f.write(text)
     
+    reports_script = '_run_model_reports.py'
+    with open(reports_script, 'r') as f:
+        text = f.read()
+
+    text = text.replace(
+        'from _run_model_keys._run_model_keys import',
+        f'from {run_folder_name}._run_model_keys import'
+    )
+    text = text.replace(
+        'from _run_generate_data import',
+        f'from {run_folder_name}._run_generate_data import'
+    )
+    destination = os.path.join(run_path, '_run_model_reports.py')
+    if not os.path.exists(destination):
+        with open(destination, 'w') as f:
+            f.write(text)
