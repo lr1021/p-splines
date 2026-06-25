@@ -33,5 +33,14 @@ def main(keys_path):
     else:
         print("Skipping replications report")
 
+    ############################################################################################# 
+    # Task Summaries Report
+    if keys.run_replications_report:
+        print("Running task summaries report")
+        import _run_model_task_summaries
+        _run_model_task_summaries.main(keys_path)
+    else:
+        print("Skipping task summaries report")
+
 if __name__ == "__main__":
     main(sys.argv[1])
