@@ -4,11 +4,11 @@ import shutil
 
 copy_keys = True
 
-run_idatas = False
+run_idatas = True
 replace_idatas = False
-idatas_workers = 512
+idatas_workers = 128
 
-run_reports = False
+run_reports = True
 replace_reports = False
 reports_workers = 100
 
@@ -16,9 +16,10 @@ run_replications_report = True
 replace_replications_report = True
 replications_report_workers = 100
 
-run_name = 'test1'
-data_name = 'data12345'
+run_name = 'tau1e_6_a1b1k5'
+data_name = 'data123454b5b'
 
+generate_data = False
 ###
 data_folder = 'data/'
 os.makedirs(data_folder, exist_ok=True)
@@ -28,14 +29,33 @@ data_path = os.path.join(data_folder, f'{data_name}.pkl')
 # f, sigma
 f_sigma_list = [('f1', 0.33), ('f1', 0.5), ('f1', 1.0),
                 ('f2', 0.33), ('f2', 0.5), ('f2', 1.0),
-                ('f3', 0.33), ('f3', 0.5), ('f3', 1.0)]
+                ('f3', 0.33), ('f3', 0.5), ('f3', 1.0),
+                ('f4', 0.33), ('f4', 0.5), ('f4', 1.0),
+                ('f5', 0.33), ('f5', 0.5), ('f5', 1.0),
+                ('f4b', 0.33), ('f4b', 0.5), ('f4b', 1.0),
+                ('f5b', 0.33), ('f5b', 0.5), ('f5b', 1.0)]
 
-f_sigma_list = [('f4', 0.33), ('f4', 0.5), ('f4', 1.0),
-                ('f5', 0.33), ('f5', 0.5), ('f5', 1.0)]
-f_sigma_list = [('f4', 0.33)]
+f_sigma_list = [('f1', 0.5), ('f1', 1.0),
+                ('f2', 0.5), ('f2', 1.0),
+                ('f3', 0.5), ('f3', 1.0),
+                ('f4', 0.5), ('f4', 1.0),
+                ('f5', 0.5), ('f5', 1.0),]
+
+f_sigma_list = [('f4b', 0.5), ('f4b', 1.0),
+                ('f5b', 0.5), ('f5b', 1.0),]
+
+#f_sigma_list = [('f4', 0.33), ('f4', 0.5), ('f4', 1.0),
+                #('f5', 0.33), ('f5', 0.5), ('f5', 1.0)]
+#f_sigma_list = [('f4', 0.33)]
+
+#f_sigma_list = [('f4', 0.5), ('f4_1000', 0.5),]
+
+if generate_data:
+    import _run_generate_data
+    _run_generate_data.main(data_path, f_sigma_list, generate_data)
 
 # replication
-replication_list = list(range(100))[:2]
+replication_list = list(range(100))[:20]
 report_replication_list = replication_list# list(range(100))[:]
 report_replication_list = replication_list[:2]
 # implementation
@@ -48,6 +68,23 @@ report_replication_list = replication_list[:2]
                        #'spectral',
                        #'ortho_spectral'][:]
 implementation_list = ['ortho_centring_T', 'ortho_centring_T_exact', 'svd', 'svd_aligned'][:]
+implementation_list = ['ortho_centring_T_exact', 'ortho_centring+dropping']
+
+implementation_list = ['centring', 'ortho_centring_T', 'ortho_centring_T_exact', 'svd', 'svd_aligned',
+                       'post_centring', 'ortho_post_centring',
+                       'centring+dropping', 'ortho_centring+dropping',
+                       'conditioning', 'ortho_conditioning',
+                       'spectral', 'ortho_spectral'][:]
+
+implementation_list = ['ortho_centring_T_exact', 'svd_aligned',
+                       'ortho_post_centring',
+                       'ortho_centring+dropping',
+                       'ortho_conditioning',
+                       'spectral', 'ortho_spectral'][:]
+
+implementation_list = ['ortho_centring_T_exact', 'svd_aligned',
+                       'ortho_centring+dropping',
+                       'ortho_spectral'][:]
 # implementation_list = ['centring+dropping', 'ortho_centring+dropping',
                        #'svd',
                        #'spectral', 'ortho_spectral'][:]
@@ -55,16 +92,17 @@ implementation_list = ['ortho_centring_T', 'ortho_centring_T_exact', 'svd', 'svd
 # 0, MvN, ortho_diag
 builder_list = ['ortho_diag']
 # penalised
-penalised_list = [True]
+penalised_list = [True, False]
 # penalised_list = [False]
 
 
 a = 1
-b = 0.005
-#b = 0.0005
+b = 0.1
+# b = 0.00005
+# b = 0.0001
 order = 2
 spline_degree = 3
-n_internal_knots = 20
+# n_internal_knots = 20
 n_internal_knots = 5
 
 n_tune = 2000

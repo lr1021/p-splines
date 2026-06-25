@@ -170,8 +170,12 @@ def html_report(model_key, reports_path, idatas_path, functions,
 
     _, w_post_flat = extract_w_post(idata)
     #w_post_flat[:, :-1] = 0
-    beta_0_var = [v for v in idata.posterior.data_vars if v.startswith("beta_0")][0]
-    b_post = idata.posterior["beta_0"].values.flatten()
+    if "beta_0_post" in idata.posterior.data_vars:
+        beta_0_var = "beta_0_post"
+    else:
+        beta_0_var = "beta_0"
+    # beta_0_var = [v for v in idata.posterior.data_vars if v.startswith("beta_0")][0]
+    b_post = idata.posterior[beta_0_var].values.flatten()
 
     X = X[x_data_order, :]
     f_post = X @ w_post_flat.T
