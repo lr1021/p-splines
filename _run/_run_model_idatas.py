@@ -27,8 +27,8 @@ from multiprocessing import Pool, Lock
 import time
 import xarray as xr
 
-from _utils_models import builder_dict, stratified_shuffle
-from _utils_reports import extract_sampling_time, write_idata_path, write_idata_path, extract_w_post
+from _utils._utils_models import builder_dict, stratified_shuffle
+from _utils._utils_reports import extract_sampling_time, write_idata_path, write_idata_path, extract_w_post
 
 # from _run_model_keys._run_model_keys import a, b, order, spline_degree, n_internal_knots, model_keys, data_path, directory_path, reports_path, idatas_path, builder, idatas_workers, run_idatas, run_reports, run_replications_report, replace_idatas, n_tune, n_draws, n_chains, n_cores, target_accept, max_treedepth, report_model_keys
 
@@ -105,7 +105,8 @@ def worker(task):
                                 nuts_sampler="nutpie",
                                 store_divergences=True,
                                 discard_tuned_samples=True,
-                                progressbar=False,
+                                progressbar=not keys.quiet,
+                                quiet=keys.quiet,
                                 target_accept=keys.target_accept,
                                 max_treedepth=keys.max_treedepth)
                 s1 = time.time()

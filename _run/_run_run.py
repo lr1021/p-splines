@@ -1,6 +1,14 @@
 import os
 import sys
+from pathlib import Path
+
+# sys.path.append(str(Path.cwd().parent))
 from importlib import import_module
+
+# print(os.getcwd())
+sys.path[0] = os.getcwd()
+# print(sys.path)
+
 
 def main(keys_path):
     keys_loc = keys_path.replace('/', '.').removesuffix('.py')
@@ -10,7 +18,7 @@ def main(keys_path):
     # Idatas
     if keys.run_idatas:
         print("Running idatas") 
-        import _run_model_idatas
+        import _run._run_model_idatas as _run_model_idatas
         _run_model_idatas.main(keys_path)
     else:
         print("Skipping idatas")
@@ -19,7 +27,7 @@ def main(keys_path):
     # Reports
     if keys.run_reports:
         print("Running reports") 
-        import _run_model_reports
+        import _run._run_model_reports as _run_model_reports
         _run_model_reports.main(keys_path)
     else:
         print("Skipping reports")
@@ -28,7 +36,7 @@ def main(keys_path):
     # Replications Reports
     if keys.run_replications_report:
         print("Running replications report")
-        import _run_model_replications_report
+        import _run._run_model_replications_report as _run_model_replications_report
         _run_model_replications_report.main(keys_path)
     else:
         print("Skipping replications report")
@@ -37,7 +45,7 @@ def main(keys_path):
     # Task Summaries Report
     if keys.run_replications_report:
         print("Running task summaries report")
-        import _run_model_task_summaries
+        import _run._run_model_task_summaries as _run_model_task_summaries
         _run_model_task_summaries.main(keys_path)
     else:
         print("Skipping task summaries report")

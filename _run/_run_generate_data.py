@@ -9,7 +9,7 @@ sys.path.insert(
 import numpy as np
 import pickle
 from itertools import product
-from _utils_functions import functions
+from _utils._utils_functions import functions
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -22,6 +22,7 @@ def main(data_path, f_sigma_list, generate_data=False):
 
     # Generating data
     if generate_data:
+        print(f'Generating Data: {data_path}')
         # print(f_sigma_list)
         data = {(f, sigma): {} for f, sigma in f_sigma_list}
         np.random.seed(42)
@@ -29,7 +30,8 @@ def main(data_path, f_sigma_list, generate_data=False):
         x = np.random.uniform(-3, 3, (replications, n))
         eps = np.random.normal(0, 1.0, (replications, n))
         for f, sigma in f_sigma_list:
-            if f in ['f5', 'f5b', 'f4b']:
+            if f in ['f5', 'f5b', 'f4b',
+                     'f7', 'f6b', 'f7b']:
                 continue
             for i in range(replications):
                 if i % 100 == 0:
@@ -46,13 +48,23 @@ def main(data_path, f_sigma_list, generate_data=False):
                             if f_ == 'f5':
                                 data[(f_, sigma)][i] = (-x_i, y_i)
                             elif f_ == 'f5b':
-                                data[('f5b', sigma)][i] = (-x_i, y_i*200.0)
+                                data[(f_, sigma)][i] = (-x_i, y_i*200.0)
                             elif f_ == 'f4b':
-                                data[('f4b', sigma)][i] = (x_i, y_i*200.0)
+                                data[(f_, sigma)][i] = (x_i, y_i*200.0)
+                if f == 'f6':
+                    for f_ in ['f7', 'f6b', 'f7b']:
+                        if f_ in [f_ for f_, _ in f_sigma_list]:
+                            if f_ == 'f7':
+                                data[(f_, sigma)][i] = (-x_i, y_i)
+                            elif f_ == 'f7b':
+                                data[(f_, sigma)][i] = (-x_i, y_i*200.0)
+                            elif f_ == 'f6b':
+                                data[(f_, sigma)][i] = (x_i, y_i*200.0)
 
         with open(data_path, "wb") as f:
             pickle.dump(data, f)
     else:
+        print(f'Reading Data: {data_path}')
         with open(data_path, "rb") as f:
             data = pickle.load(f)
     return data

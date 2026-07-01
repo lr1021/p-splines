@@ -11,8 +11,8 @@ import numpy as np
 import pickle
 from multiprocessing import Pool
 
-from _utils_reports import html_report
-from _utils_functions import functions
+from _utils._utils_reports import html_report
+from _utils._utils_functions import functions
 
 import warnings
 warnings.filterwarnings('ignore')

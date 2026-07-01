@@ -1,3 +1,5 @@
+# from copyreg import pickle
+import pickle
 from re import match
 import re
 import numpy as np
@@ -9,7 +11,7 @@ import base64
 import pandas as pd
 import xarray as xr
 
-from _utils_models import builder_dict
+from _utils._utils_models import builder_dict
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -55,6 +57,37 @@ def extract_sampling_time(model_key, idatas_path):
         sampling_time = np.nan
         #sampling_time = idata.sample_stats.attrs["sampling_time"]
     return sampling_time
+
+def function_plot(f, x_plot, functions, replication, x_data):
+        if f in functions:
+            return functions[f](x_plot), x_plot
+        elif np.any([f_name_start in f for f_name_start in ['uniform', 'exponential', 'uni_normal', 'bi_normal']]):
+            m = re.fullmatch(r'([A-Za-z_]+)_(\d+)_(\d+)_(\d+)', f)
+            function_name = m.group(1)
+            num_knots = int(m.group(2))
+            n_val = int(m.group(3))
+            scale = int(m.group(4))
+
+            curve_plot_dict_path = os.path.join("data", f"curve_plot_dict_{num_knots}.pkl")
+            with open(curve_plot_dict_path, "rb") as pl:
+                curve_plot_dict = pickle.load(pl)
+            f_plot = curve_plot_dict[(function_name, n_val, replication)]*scale
+            x_pl = np.linspace(np.min(x_data), np.max(x_data), len(f_plot))
+
+            return f_plot, x_pl
+
+def f_plot_post(X, w_post_flat, b_post, builder):
+        f_p = X @ w_post_flat.T
+        
+        # x_plot = x_data[x_data_order]
+        f_p += b_post
+        if builder in ['nb_ortho_diag', 'p_ortho_diag']:
+            f_p = np.exp(f_p)
+        f_plot_mean = np.mean(f_p, axis=1)
+        f_plot_median = np.median(f_p, axis=1)
+        f_plot_975 = np.percentile(f_p, 97.5, axis=1)
+        f_plot_025 = np.percentile(f_p, 2.5, axis=1)
+        return f_plot_mean, f_plot_median, f_plot_025, f_plot_975
 
 def html_report(model_key, reports_path, idatas_path, functions,
                 a, b, order, spline_degree, n_internal_knots, data,
@@ -122,9 +155,9 @@ def html_report(model_key, reports_path, idatas_path, functions,
                     "r_hat>1.01_mean": []}
     # f posterior summaries
     w_post, _ = extract_w_post(idata)
-    #f_plot_post = np.einsum('ij,cdj->cdi', X_plot, w_post)
-    f_plot_post = w_post @ X_plot.T
-    f_idata = az.convert_to_inference_data(xr.DataArray(f_plot_post,
+    #f_p = np.einsum('ij,cdj->cdi', X_plot, w_post)
+    f_p = w_post @ X_plot.T
+    f_idata = az.convert_to_inference_data(xr.DataArray(f_p,
                                                         dims=["chain", "draw", "x"]))
     f_rhat = az.rhat(f_idata)["x"].values
     f_ess_bulk = az.ess(f_idata, method="bulk")["x"].values / sampling_time
@@ -178,38 +211,67 @@ def html_report(model_key, reports_path, idatas_path, functions,
     b_post = idata.posterior[beta_0_var].values.flatten()
 
     X = X[x_data_order, :]
-    f_post = X @ w_post_flat.T
-    f_post += b_post
-    f_mean = np.mean(f_post, axis=1)
-    f_median = np.median(f_post, axis=1)
-    f_975 = np.percentile(f_post, 97.5, axis=1)
-    f_025 = np.percentile(f_post, 2.5, axis=1)
-
-    f_plot_post = X @ w_post_flat.T
-    x_plot = x_data[x_data_order]
-    f_plot_post += b_post
-    f_plot_mean = np.mean(f_plot_post, axis=1)
-    f_plot_median = np.median(f_plot_post, axis=1)
-    f_plot_975 = np.percentile(f_plot_post, 97.5, axis=1)
-    f_plot_025 = np.percentile(f_plot_post, 2.5, axis=1)
-
+    ###
+    f_plot_mean, f_plot_median, f_plot_025, f_plot_975 = f_plot_post(X_plot, w_post_flat, b_post, builder)
+    f_min = np.min(f_plot_025)
+    f_max = np.max(f_plot_975)
+    f_range = f_max - f_min
+    ###
+    
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.scatter(x_data, y_data, marker='o', label='Data', alpha=0.5, s=1, color='blue')
+    if not builder in ['nb_ortho_diag', 'p_ortho_diag']:
+        ax.scatter(x_data, y_data, marker='o', label='Data', alpha=0.5, s=1, color='blue')
+    else:
+        if 'ax2' not in locals():
+            ax2 = ax.twinx()
+        y_min = np.min(y_data)
+        y_max = np.max(y_data)
+        y_range = y_max - y_min
+
+        ax2.scatter(x_data, y_data, marker='o', label='Data', alpha=0.5, s=1, color='blue')
+        ax2.set_ylim((f_min/f_range - 0.1)*y_range, (f_max/f_range + 0.1)*y_range)
+
     #ax.plot(x_data[x_data_order], f_mean, label='Posterior Mean data', color='red', linestyle='dashed')
+    ax.set_ylim((f_min/f_range - 0.1)*f_range, (f_max/f_range + 0.1)*f_range)
+    ax.set_xlim(np.min(x_data), np.max(x_data))
     ax.plot(x_plot, f_plot_mean, label='Posterior Mean plot', color='red')
     ax.plot(x_plot, f_plot_median, label='Posterior Median', color='orange', linestyle='dashed')
-    #ax.plot(x_plot, functions[f](x_plot) - np.mean(functions[f](x_plot)), label='True Function', color='green')
-    ax.plot(x_plot, functions[f](x_plot), label='True Function', color='green')
     ax.fill_between(x_plot, f_plot_025, f_plot_975, color='red', alpha=0.3, label='95% Credible Interval')
+    
+    if not ('dengue' in f):
+        f_plot, x_pl = function_plot(f, x_plot, functions, replication, x_data)
+        ax.plot(x_pl, f_plot, label='True Function', color='green')
+
+    # if f in functions:
+        # ax.plot(x_plot, functions[f](x_plot) - np.mean(functions[f](x_plot)), label='True Function', color='green')
+        # ax.plot(x_plot, functions[f](x_plot), label='True Function', color='green')
+    # elif np.any([f_name_start in f for f_name_start in ['uniform', 'exponential', 'uni_normal', 'bi_normal']]):
+        # m = re.fullmatch(r'([A-Za-z_]+)_(\d+)_(\d+)_(\d+)', f)
+        # function_name = m.group(1)
+        # num_knots = int(m.group(2))
+        # n_val = int(m.group(3))
+        # scale = int(m.group(4))
+
+        # curve_plot_dict_path = os.path.join("data", f"curve_plot_dict_{num_knots}.pkl")
+        # with open(curve_plot_dict_path, "rb") as pl:
+            # curve_plot_dict = pickle.load(pl)
+        # f_plot = curve_plot_dict[(function_name, n_val, replication)]*scale
+        # x_pl = np.linspace(np.min(x_data), np.max(x_data), len(f_plot))
+        # ax.plot(x_pl, f_plot, label='True Function', color='green')
+    # ax.plot(x_plot, functions[f](x_plot), label='True Function', color='green')
+
+    
     ax.set_title(f"Spline Fit: {model_key}")
-    ax.legend()
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     img_base64 = fig_to_base64(fig)
     report_parts.append(f"<h2>Spline Fit</h2><img src='data:image/png;base64,{img_base64}' />")
 
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.plot(x_plot, X[:, -1])
-    img_base64 = fig_to_base64(fig)
-    report_parts.append(f"<h2>Spline Basis</h2><img src='data:image/png;base64,{img_base64}' />")
+    plot_basis = False
+    if plot_basis:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.plot(x_plot, X[:, -1])
+        img_base64 = fig_to_base64(fig)
+        report_parts.append(f"<h2>Spline Basis</h2><img src='data:image/png;base64,{img_base64}' />")
 
     report_parts.append("</body></html>")
 

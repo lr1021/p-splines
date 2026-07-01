@@ -1,5 +1,5 @@
 import os
-from _run_generate_data import data_name
+from _run._run_generate_data import data_name
 import shutil
 
 
