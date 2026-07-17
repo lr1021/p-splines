@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
+from pytensor.tensor.math import softplus
 from scipy.linalg import null_space
 from _utils._utils_spline import eval_spline_basis_equispaced_numeric, difference_matrix
 
@@ -11,15 +12,20 @@ import warnings
 warnings.filterwarnings('ignore')
 
 ###
+
+###
 # print(os.listdir("data"))
-dengue_data = pd.read_csv(os.path.join("data", "dengue.csv.gz"), usecols=['geocode', 'date', 'casos', 'epiweek', 'uf', 'macroregional_geocode', 'regional_geocode', 'uf_code'])
-map_regional_health = pd.read_csv(os.path.join("data", "map_regional_health.csv"))
-pop_data = pd.read_csv(os.path.join("data", "datasus_population_2001_2025.csv.gz"))
-map_regional_health = map_regional_health.merge(pop_data, how='left', on='geocode')
-mr_code_to_pop = map_regional_health.groupby(['macroregional_geocode', 'year'])['population'].sum().to_dict()
-macroregional_geocode = 3521
-year = 2025
-pop = mr_code_to_pop[(macroregional_geocode, year)]
+try:
+    dengue_data = pd.read_csv(os.path.join("data", "dengue.csv.gz"), usecols=['geocode', 'date', 'casos', 'epiweek', 'uf', 'macroregional_geocode', 'regional_geocode', 'uf_code'])
+    map_regional_health = pd.read_csv(os.path.join("data", "map_regional_health.csv"))
+    pop_data = pd.read_csv(os.path.join("data", "datasus_population_2001_2025.csv.gz"))
+    map_regional_health = map_regional_health.merge(pop_data, how='left', on='geocode')
+    mr_code_to_pop = map_regional_health.groupby(['macroregional_geocode', 'year'])['population'].sum().to_dict()
+    macroregional_geocode = 3521
+    year = 2025
+    pop = mr_code_to_pop[(macroregional_geocode, year)]
+except:
+    print('Failed Data')
 ###
 
 def stratified_shuffle(df, stratify_cols, random_cols, random_state=None):
@@ -639,7 +645,7 @@ def build_model_ortho_MvN(x_data, y_data, a, b, spline_degree, n_internal_knots,
         y_obs = pm.Normal('y_obs', mu=eta, sigma=np.sqrt(sigma_2), observed=y_data)
     return model, X, X_plot, var_names
 
-def build_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal_knots, implementation, penalised, order, tau_val=1e-6):
+def build_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal_knots, implementation, penalised, order, tau_val=1e-4):
     model = pm.Model()
     with model:
         # Priors
@@ -2811,7 +2817,7 @@ def build_nb_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal_kn
         var_names = ['beta_0', 'alpha', 'tau']
 
         # tau = pm.Gamma("tau", alpha=a, beta=b)#+1e-2 #, initval=1.0)
-        tau = pm.Deterministic("tau", pt.as_tensor_variable(1e-6))
+        tau = pm.Deterministic("tau", pt.as_tensor_variable(1e-8))
         if penalised:
             tau_p = pm.Gamma("tau_p", alpha=a, beta=b)#+1e-2#, initval=1.0)
             #tau_p = pm.Deterministic("tau_p", pt.as_tensor_variable(1.0))
@@ -3273,7 +3279,9 @@ def build_nb_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal_kn
 
         eta = beta_0 + f
         # Likelihood
-        y_obs = pm.NegativeBinomial('y_obs', mu=pt.exp(pt.log(pop) + eta), alpha=alpha, observed=y_data)
+        # y_obs = pm.NegativeBinomial('y_obs', mu=pt.exp(pt.log(pop) + eta), alpha=alpha, observed=y_data)
+        y_obs = pm.NegativeBinomial('y_obs', mu=softplus(eta), alpha=alpha, observed=y_data)
+    
     return model, X, X_plot, var_names
 
 

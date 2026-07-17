@@ -74,6 +74,7 @@ def worker(args):
         result[f"f_plot_median_i{i+1}"] = f_plot_median
         result[f"f_plot_025_i{i+1}"] = f_plot_025
         result[f"f_plot_975_i{i+1}"] = f_plot_975
+        result[f"f_plot_range95CI_i{i+1}"] = np.mean(f_plot_975 - f_plot_025)
 
     result['f_plot_mean_diff'] = np.sqrt(np.sum((result['f_plot_mean_i1'] - result['f_plot_mean_i2']) ** 2))
     result['f_plot_median_diff'] = np.sqrt(np.sum((result['f_plot_median_i1'] - result['f_plot_median_i2']) ** 2))
@@ -108,7 +109,7 @@ def main(keys_path):
         for i, row in model_keys_df_f_sigma_penalised_builder.iterrows():
             f, sigma, penalised, builder = row
 
-            comparison_report_path = os.path.join(comparison_report_folder, f"comparison_report({i1}_{i2})({f}_{sigma}_{penalised}).html")
+            comparison_report_path = os.path.join(comparison_report_folder, f"comparison_report({i1}_{i2})({f}_{sigma}_{penalised}_{builder}).html")
             if os.path.exists(comparison_report_path) and not keys.replace_comparison_report:
                 print(f"Comparison report for {i1} vs {i2} already exists. Skipping...")
                 continue
@@ -146,9 +147,13 @@ def main(keys_path):
                     results = p.map(worker, tasks)
                 
                 comparison_df = pd.DataFrame(results)
-                comparison_df.sort_values(['f_plot_mean_diff'], inplace=True, ascending=False)
-                top_n = 10
-                top_comparison_df = comparison_df.head(top_n)
+                if hasattr(keys, 'spread') and keys.spread:
+                    comparison_report_path = os.path.join(comparison_report_folder, f"comparison_report({i1}_{i2})({f}_{sigma}_{penalised}_{builder})_{keys.spread_start}spread{keys.spread_step}.html")
+                    top_comparison_df = comparison_df[keys.spread_start::keys.spread_step]
+                else:
+                    comparison_df.sort_values(['f_plot_mean_diff'], inplace=True, ascending=False)
+                    top_n = keys.top_n if hasattr(keys, 'top_n') else 10
+                    top_comparison_df = comparison_df.head(top_n)
 
                 html_parts = [f"<html><head><title>Comparison Report: {i1} vs {i2}</title>",
                                 "<style>",
@@ -158,7 +163,8 @@ def main(keys_path):
                                 "table th, table td { border: 1px solid #aaa; padding: 4px 6px; text-align: center; }",
                                 "img { max-width: 80%; margin: 8px auto; display: block; }",
                                 "</style></head><body>",
-                                f"<h1>Comparison Report: {i1} vs {i2}</h1>"]
+                                f"<h1>Comparison Report: {i1} vs {i2}</h1>",
+                                f"<h1>{f}, {sigma}, {penalised}, {builder}</h1>"]
                 
                 
                 for _, row in top_comparison_df.iterrows():
@@ -174,24 +180,29 @@ def main(keys_path):
                     f_plot_025_i2 = row['f_plot_025_i2']
                     f_plot_975_i1 = row['f_plot_975_i1']
                     f_plot_975_i2 = row['f_plot_975_i2']
+                    f_plot_range95CI_i1 = row['f_plot_range95CI_i1']
+                    f_plot_range95CI_i2 = row['f_plot_range95CI_i2']
 
-                    fig, ax = plt.subplots(figsize=(6, 4))
-                    ax.scatter(x_data, y_data, marker='o', label='Data', alpha=0.5, s=1, color='blue')
+                    fig, ax = plt.subplots(figsize=(12, 4))
                     c1 = 'red'
                     c2 = 'green'
                     ax.plot(x_plot, f_plot_mean_i1, label=f'Posterior Mean {i1}', color=c1)
                     ax.plot(x_plot, f_plot_mean_i2, label=f'Posterior Mean {i2}', color=c2)
-                    ax.fill_between(x_plot, f_plot_025_i1, f_plot_975_i1, color=c1, alpha=0.05, label=f'95% Credible Interval {i1}', linewidth=0.5)
-                    ax.fill_between(x_plot, f_plot_025_i2, f_plot_975_i2, color=c2, alpha=0.05, label=f'95% Credible Interval {i2}', linewidth=0.5)
+                    ax.fill_between(x_plot, f_plot_025_i1, f_plot_975_i1, color=c1, alpha=0.08, label=f'95% Credible Interval {i1}', linewidth=0.5)
+                    ax.fill_between(x_plot, f_plot_025_i2, f_plot_975_i2, color=c2, alpha=0.08, label=f'95% Credible Interval {i2}', linewidth=0.5)
 
-                    if not ("dengue" in f):
+                    if not (("dengue" in f) or ("cherry" in f)):
                         f_plot, x_pl = function_plot(f, x_plot, functions, r, x_data)
                         ax.plot(x_pl, f_plot, label='True Function', color='black', linestyle='--', linewidth=0.5)
+                    if not (builder in ['nb_ortho_diag', 'p_ortho_diag']):
+                        ax.scatter(x_data, y_data, marker='x', label='Data', alpha=1.0, s=20, color='blue')
                     
                     ax.set_title(f"Replication: {r}")
                     ax.legend(bbox_to_anchor=(1.05, 1))
                     img_base64 = fig_to_base64(fig)
                     html_parts.append(f"<h2>Replication: {r}</h2><img src='data:image/png;base64,{img_base64}' />")
+                    html_parts.append(f"<h2>95CI size: {i1}: {f_plot_range95CI_i1:.2f}</h2>")
+                    html_parts.append(f"<h2>95CI size: {i2}: {f_plot_range95CI_i2:.2f}</h2>")
                 html_parts.append("</body></html>")
                 with open(comparison_report_path, "w") as o:
                     o.write("\n".join(html_parts))

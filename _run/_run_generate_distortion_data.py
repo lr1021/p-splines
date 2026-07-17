@@ -1,8 +1,15 @@
+import os
+import sys
+
+sys.path.insert(
+    0,
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
 
 from _utils._utils_spline import eval_spline_basis_equispaced_numeric
 
@@ -76,55 +83,57 @@ def generate_curve_dict(distribution_list, n_list, replication_list, num_knots, 
                     B = eval_spline_basis_equispaced_numeric(degree, np.min(x_vals), np.max(x_vals), num_knots, x_vals)['B']
                     v, pen = max_ratio_cond(B)
                     curve = B@v
-                    curve = curve/(np.max(curve) - np.min(curve))
-                    curve_dict[(dist, n_val, r)] = curve
-                    pen_dict[(dist, n_val, r)] = pen
                     if plot:
                         x_plot = np.linspace(np.min(x_vals), np.max(x_vals), 100)
                         B_plot = eval_spline_basis_equispaced_numeric(degree, np.min(x_plot), np.max(x_plot), num_knots, x_plot)['B']
                         curve_plot = B_plot@v
                         curve_plot = curve_plot/(np.max(curve) - np.min(curve))
                         curve_plot_dict[(dist, n_val, r)] = curve_plot
+                    curve = curve/(np.max(curve) - np.min(curve))
+                    curve_dict[(dist, n_val, r)] = curve
+                    pen_dict[(dist, n_val, r)] = pen
     if plot:           
         return curve_dict, curve_plot_dict, pen_dict
     else:
         return curve_dict, pen_dict
     
-def generate_data(distribution_list, n_list, sigma_list, replication_list, num_knots, data_dict):
+def generate_data(scale_list, distribution_list, n_list, sigma_list, replication_list, num_knots, data_dict):
     f_sigma_list = []
     for dist in distribution_list:
-        for n in n_list: 
-            for sigma in sigma_list:  
-                f_sigma_list.append((f'{dist}_{n}', sigma))
+        for n_val in n_list: 
+            for scale in scale_list:
+                for sigma in sigma_list:  
+                    f_sigma_list.append((f'{dist}_{num_knots}_{n_val}_{scale}', sigma))
     data = {(f, sigma): {} for f, sigma in f_sigma_list}
 
-    scale = 1000
+
+    np.random.seed(0)
+    eps = np.random.normal(0.0, 1.0, (len(replication_list), np.max(n_list)))
+    
     for dist in distribution_list:
-        np.random.seed(0)
-        eps = np.random.normal(0.0, 1.0, (len(replication_list), np.max(n_list)))
         for n_val in n_list:
             for i, r in enumerate(replication_list):
                 x_n_r = data_dict[(dist, n_val, r)].copy()
-                eps_n_r = eps[i, :]
-                data_dict[(dist, n_val, r)] = x_n_r
+                eps_n_r = eps[i, :n_val].copy()
                 degree = 3
                 x_vals = x_n_r.copy()
-                x_plot = np.linspace(np.min(x_vals), np.max(x_vals), 100)
-                if num_knots > len(x_vals):
-                    B = eval_spline_basis_equispaced_numeric(degree, np.min(x_vals), np.max(x_vals), num_knots, x_vals)['B']
-                    B_plot = eval_spline_basis_equispaced_numeric(degree, np.min(x_vals), np.max(x_vals), num_knots, x_plot)['B']
-                    v = max_ratio_cond(B)
-
-                    curve = B@v
-                    curve = curve/(np.max(curve) - np.min(curve))
+                # x_plot = np.linspace(np.min(x_vals), np.max(x_vals), 100)
+                B = eval_spline_basis_equispaced_numeric(degree, np.min(x_vals), np.max(x_vals), num_knots, x_vals)['B']
+                # B_plot = eval_spline_basis_equispaced_numeric(degree, np.min(x_vals), np.max(x_vals), num_knots, x_plot)['B']
+                v = max_ratio_cond(B)[0]
+                curve = B@v
+                curve = curve/(np.max(curve) - np.min(curve))
+                curve = curve.flatten()
+                
+                for scale in scale_list:
                     for sigma in sigma_list:
                         y = (curve + sigma * eps_n_r/5.0) * scale
-                        data[(f'{dist}_{n_val}', sigma)][r] = (x_n_r, y)
+                        data[(f'{dist}_{num_knots}_{n_val}_{scale}', sigma)][r] = (x_n_r, y)
     return data
 
 ###
 
-n_list = [10, 50, 100, 500]
+n_list = [10, 50, 100]
 distribution_list = ['uniform', 'uni_normal', 'bi_normal', 'exponential']
 n_replications = 100
 replication_list = list(range(n_replications))
@@ -162,14 +171,19 @@ with open(curve_plot_dict_path, "rb") as f:
 
 ###
 
-sigma_list = [0.1, 0.5, 1.0]
+# dataQ_5
+sigma_list = [0.05, 0.1, 0.5, 1.0]
 scale_list = [100, 200, 500, 1000, 2000]
 
+# dataQ_5_000
+sigma_list = [0.05, 0.1, 0.5, 1.0]
+scale_list = [1000, 2000]
+
 gen_data = False
-data_path = os.path.join("../data", f"dataQ_{num_knots}.pkl")
+data_path = os.path.join("../data", f"dataQ_{num_knots}_000.pkl")
 
 if gen_data:
-    data = generate_data(scale_list, distribution_list, n_list, sigma_list, replication_list, num_knots, data_dict, curve_dict)
+    data = generate_data(scale_list, distribution_list, n_list, sigma_list, replication_list, num_knots, data_dict)
     with open(data_path, "wb") as f:
         pickle.dump(data, f)
 with open(data_path, "rb") as f:

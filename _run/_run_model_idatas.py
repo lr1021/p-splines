@@ -61,16 +61,14 @@ def worker(task):
         model_data = data[(f, sigma)][replication]
         x_data = model_data[0]
         y_data = model_data[1]
-        model, _, _, _ = builder_dict[builder](x_data, y_data, keys.a, keys.b,
+        try:
+            model, _, _, _ = builder_dict[builder](x_data, y_data, keys.a, keys.b,
                             keys.spline_degree, keys.n_internal_knots,
                             implementation, penalised, keys.order)
-        
-        model_data = data[(f, sigma)][replication]
-        x_data = model_data[0]
-        y_data = model_data[1]
-        model, _, _, _ = builder_dict[builder](x_data, y_data, keys.a, keys.b,
-                            keys.spline_degree, keys.n_internal_knots,
-                            implementation, penalised, keys.order)
+        except Exception as e:
+            print(f"Error in building model for task {task}: {e}")
+            return
+
         # first sample
         with model:
             try:
@@ -94,6 +92,10 @@ def worker(task):
                 print(f"Error in first sampling task {task}: {e}")
         gc.collect()
 
+        model, _, _, _ = builder_dict[builder](x_data, y_data, keys.a, keys.b,
+                            keys.spline_degree, keys.n_internal_knots,
+                            implementation, penalised, keys.order)
+        
         with model:
             try:
                 s0 = time.time()

@@ -49,6 +49,18 @@ def main(keys_path):
         _run_model_task_summaries.main(keys_path)
     else:
         print("Skipping task summaries report")
+    
+    ############################################################################################# 
+    # Comparisons Report
+    try:
+        if keys.run_comparison_report:
+            print("Running comparisons report")
+            import _run._run_model_comparison as _run_model_comparison
+            _run_model_comparison.main(keys_path)
+        else:
+            print("Skipping comparisons report")
+    except Exception as e:
+        print(f"Error occurred while running comparisons report: {e}")
 
 if __name__ == "__main__":
     main(sys.argv[1])

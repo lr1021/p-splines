@@ -81,8 +81,10 @@ def f_plot_post(X, w_post_flat, b_post, builder):
         
         # x_plot = x_data[x_data_order]
         f_p += b_post
+
         if builder in ['nb_ortho_diag', 'p_ortho_diag']:
-            f_p = np.exp(f_p)
+            # f_p = np.exp(f_p)
+            f_p = np.log(1 + np.exp(f_p))  # softplus transformation for non-negative outputs
         f_plot_mean = np.mean(f_p, axis=1)
         f_plot_median = np.median(f_p, axis=1)
         f_plot_975 = np.percentile(f_p, 97.5, axis=1)
@@ -213,12 +215,13 @@ def html_report(model_key, reports_path, idatas_path, functions,
     X = X[x_data_order, :]
     ###
     f_plot_mean, f_plot_median, f_plot_025, f_plot_975 = f_plot_post(X_plot, w_post_flat, b_post, builder)
-    f_min = np.min(f_plot_025)
-    f_max = np.max(f_plot_975)
+    f_min = np.nanmin(f_plot_025)
+    f_max = np.nanmax(f_plot_975)
+    
     f_range = f_max - f_min
     ###
     
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(12, 4))
     if not builder in ['nb_ortho_diag', 'p_ortho_diag']:
         ax.scatter(x_data, y_data, marker='o', label='Data', alpha=0.5, s=1, color='blue')
     else:
@@ -238,7 +241,7 @@ def html_report(model_key, reports_path, idatas_path, functions,
     ax.plot(x_plot, f_plot_median, label='Posterior Median', color='orange', linestyle='dashed')
     ax.fill_between(x_plot, f_plot_025, f_plot_975, color='red', alpha=0.3, label='95% Credible Interval')
     
-    if not ('dengue' in f):
+    if not (('dengue' in f) or ('cherry' in f)):
         f_plot, x_pl = function_plot(f, x_plot, functions, replication, x_data)
         ax.plot(x_pl, f_plot, label='True Function', color='green')
 
