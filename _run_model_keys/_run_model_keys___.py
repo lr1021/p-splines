@@ -145,7 +145,7 @@ os.makedirs(reports_path, exist_ok=True)
 os.makedirs(idatas_path, exist_ok=True)
 
 if copy_keys:
-    current_script = '_run_model_keys/_run_model_keys.py'
+    current_script = os.path.abspath(__file__)
     destination = os.path.join(run_path, '_run_model_keys.py')
     if not os.path.exists(destination):
         shutil.copy2(current_script, destination)

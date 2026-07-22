@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import traceback
 
 # sys.path.append(str(Path.cwd().parent))
 from importlib import import_module
@@ -61,6 +62,7 @@ def main(keys_path):
             print("Skipping comparisons report")
     except Exception as e:
         print(f"Error occurred while running comparisons report: {e}")
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main(sys.argv[1])

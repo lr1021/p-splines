@@ -191,10 +191,12 @@ def main(keys_path):
                     ax.fill_between(x_plot, f_plot_025_i1, f_plot_975_i1, color=c1, alpha=0.08, label=f'95% Credible Interval {i1}', linewidth=0.5)
                     ax.fill_between(x_plot, f_plot_025_i2, f_plot_975_i2, color=c2, alpha=0.08, label=f'95% Credible Interval {i2}', linewidth=0.5)
 
-                    if not (("dengue" in f) or ("cherry" in f)):
+                    if not (("dengue" in f) or ("cherry" in f) or ("weighted" in f)):
                         f_plot, x_pl = function_plot(f, x_plot, functions, r, x_data)
                         ax.plot(x_pl, f_plot, label='True Function', color='black', linestyle='--', linewidth=0.5)
-                    if not (builder in ['nb_ortho_diag', 'p_ortho_diag']):
+                    if not (builder in ['nb_ortho_diag', 'p_ortho_diag', 'popnb_ortho_diag']):
+                        if isinstance(y_data, tuple):
+                            y_data = y_data[0]
                         ax.scatter(x_data, y_data, marker='x', label='Data', alpha=1.0, s=20, color='blue')
                     
                     ax.set_title(f"Replication: {r}")

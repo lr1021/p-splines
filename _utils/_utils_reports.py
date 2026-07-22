@@ -82,6 +82,9 @@ def f_plot_post(X, w_post_flat, b_post, builder):
         # x_plot = x_data[x_data_order]
         f_p += b_post
 
+        if builder in ['popnb_ortho_diag']:
+            f_p -= b_post
+            f_p = np.exp(f_p)  # exponential transformation for non-negative outputs
         if builder in ['nb_ortho_diag', 'p_ortho_diag']:
             # f_p = np.exp(f_p)
             f_p = np.log(1 + np.exp(f_p))  # softplus transformation for non-negative outputs
@@ -113,6 +116,8 @@ def html_report(model_key, reports_path, idatas_path, functions,
     y_data = model_data[1]
     model, X, X_plot, var_names = builder_dict[builder](x_data=x_data, y_data=y_data, a=a, b=b, spline_degree=spline_degree, n_internal_knots=n_internal_knots, implementation=implementation, penalised=penalised, order=order)
     x_plot = np.linspace(np.min(x_data), np.max(x_data), X_plot.shape[0])
+    if isinstance(y_data, tuple):
+        y_data = y_data[0]
 
     # base and title
     title = f"Model Report: {model_key}"
@@ -241,7 +246,7 @@ def html_report(model_key, reports_path, idatas_path, functions,
     ax.plot(x_plot, f_plot_median, label='Posterior Median', color='orange', linestyle='dashed')
     ax.fill_between(x_plot, f_plot_025, f_plot_975, color='red', alpha=0.3, label='95% Credible Interval')
     
-    if not (('dengue' in f) or ('cherry' in f)):
+    if not (('dengue' in f) or ('cherry' in f) or ('weighted' in f)):
         f_plot, x_pl = function_plot(f, x_plot, functions, replication, x_data)
         ax.plot(x_pl, f_plot, label='True Function', color='green')
 
