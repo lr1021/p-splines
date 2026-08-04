@@ -3297,7 +3297,7 @@ def build_popnb_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal
         var_names = ['beta_0', 'alpha', 'tau']
 
         # tau = pm.Gamma("tau", alpha=a, beta=b)#+1e-2 #, initval=1.0)
-        tau = pm.Deterministic("tau", pt.as_tensor_variable(1e-0))
+        tau = pm.Deterministic("tau", pt.as_tensor_variable(1e1))
         if penalised:
             tau_p = pm.Gamma("tau_p", alpha=a, beta=b)#+1e-2#, initval=1.0)
             #tau_p = pm.Deterministic("tau_p", pt.as_tensor_variable(1.0))

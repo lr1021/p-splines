@@ -8,6 +8,7 @@ sys.path.insert(
 from _run._run_model_reports import worker
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.scale import FuncScale
 import arviz as az
 import pymc as pm
 import pandas as pd
@@ -49,8 +50,8 @@ def worker(args):
 
     for i, implementation in enumerate([i1, i2]):
         model_key = (f, sigma, implementation, penalised, r, builder)
-        
         idata_path = write_idata_path(model_key, _worker_keys_dict['idatas_path'])
+
         if os.path.exists(idata_path):
             idata = az.from_netcdf(idata_path)
         else:
@@ -60,6 +61,36 @@ def worker(args):
              x_data=x_data, y_data=y_data, a=_worker_keys_dict['a'], b=_worker_keys_dict['b'],
              spline_degree=_worker_keys_dict['spline_degree'], n_internal_knots=_worker_keys_dict['n_internal_knots'],
              implementation=implementation, penalised=penalised, order=_worker_keys_dict['order'])
+        if _worker_keys_dict['loo']:
+            if ("log_likelihood" not in idata.groups()):
+                print(f"Computing log_likelihood for {model_key}")
+                with model:
+                    idata = pm.compute_log_likelihood(idata)
+                # optionally save it back
+                idata.load()
+                tmp_path = idata_path + ".tmp"
+                idata.to_netcdf(tmp_path)
+                os.replace(tmp_path, idata_path)
+            idata_path = write_idata_path(model_key, _worker_keys_dict['idatas_path'])
+            
+            loo_path = idata_path.replace(".nc", "_loo.pkl")
+            if os.path.exists(loo_path):
+                with open(loo_path, "rb") as l_path:
+                    loo = pickle.load(l_path)
+            else:
+                loo = az.loo(idata, pointwise=True)
+                with open(loo_path, "wb") as l_path:
+                    pickle.dump(loo, l_path)
+            result[f"elpd_loo_i{i+1}"] = loo.elpd_loo
+            result[f"elpd_loo_pointwise_i{i+1}"] = loo.loo_i
+            result[f"elpd_loo_se_i{i+1}"] = loo.se
+            result[f"p_loo_i{i+1}"] = loo.p_loo
+            result[f'n_data_points'] = loo.n_data_points
+            result[f"loo_bad_k_i{i+1}"] = np.sum(loo.pareto_k > loo.good_k)
+
+            idata.close()
+
+
         x_plot = np.linspace(np.min(x_data), np.max(x_data), X_plot.shape[0])
 
         _, w_post_flat = extract_w_post(idata)
@@ -140,7 +171,8 @@ def main(keys_path):
                     'order': keys.order,
                     'spline_degree': keys.spline_degree,
                     'n_internal_knots': keys.n_internal_knots,
-                    'idatas_path': keys.idatas_path
+                    'idatas_path': keys.idatas_path,
+                    'loo': (keys.loo if hasattr(keys, 'loo') else False)
                 }
 
                 with Pool(N_WORKERS, initializer=init_worker, initargs=(data, keys_dict, builder_dict)) as p:
@@ -194,17 +226,112 @@ def main(keys_path):
                     if not (("dengue" in f) or ("cherry" in f) or ("weighted" in f)):
                         f_plot, x_pl = function_plot(f, x_plot, functions, r, x_data)
                         ax.plot(x_pl, f_plot, label='True Function', color='black', linestyle='--', linewidth=0.5)
+
+                    if isinstance(y_data, tuple):
+                        y_data = y_data[0]
                     if not (builder in ['nb_ortho_diag', 'p_ortho_diag', 'popnb_ortho_diag']):
-                        if isinstance(y_data, tuple):
-                            y_data = y_data[0]
                         ax.scatter(x_data, y_data, marker='x', label='Data', alpha=1.0, s=20, color='blue')
-                    
+                    else:
+                        ax.set_ylim(ymin=0)
+                        knots = (np.max(x_data) - np.min(x_data))/(keys.n_internal_knots + 1) * np.arange(0, keys.n_internal_knots + 2) + np.min(x_data)
+                        if hasattr(keys, 'show_knots') and keys.show_knots:
+                            for knot in knots:
+                                ax.axvline(x=knot, color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+                        if hasattr(keys, 'show_data_density') and keys.show_data_density:
+                            ax_hist = ax.twinx()
+                            ax_hist.hist(
+                                x_data,
+                                bins=knots,
+                                density=True,
+                                alpha=0.07,
+                                color='blue',
+                                label='Data Histogram'
+                            )
+                            ax_hist.hist(
+                                x_data,
+                                bins=knots,
+                                density=True,
+                                histtype='step',
+                                color='black',
+                                linewidth=1.0
+                            )
+                            ax_hist.set_ylabel("x Data Density")
+                            ax_hist.set_zorder(0)          # optional: draw behind main axis
+                            ax.patch.set_alpha(0)          # optional: keep histogram visible
+                        elif hasattr(keys, 'show_pointwise_loo_diff') and keys.show_pointwise_loo_diff:
+                            elpd_loo_diff = row['elpd_loo_pointwise_i1'] - row['elpd_loo_pointwise_i2']
+                            pointwise_loo_threshold = 0
+                            ax_loo = ax.twinx()
+                            ax_loo.scatter(x_data[elpd_loo_diff < -pointwise_loo_threshold], y_data[elpd_loo_diff < -pointwise_loo_threshold], marker='o', label=f'Pointwise LOO: {i2} better', alpha=0.7, s=20, color='green')
+                            ax_loo.scatter(x_data[elpd_loo_diff > pointwise_loo_threshold], y_data[elpd_loo_diff > pointwise_loo_threshold], marker='o', label=f'Pointwise LOO: {i1} better', alpha=0.7, s=20, color='red')
+                            ax_loo.set_ylabel("elpd loo diff")
+                            ax_loo.set_zorder(0)          # optional: draw behind main axis
+                            ax.patch.set_alpha(0)          # optional: keep histogram visible
+                
                     ax.set_title(f"Replication: {r}")
                     ax.legend(bbox_to_anchor=(1.05, 1))
                     img_base64 = fig_to_base64(fig)
                     html_parts.append(f"<h2>Replication: {r}</h2><img src='data:image/png;base64,{img_base64}' />")
                     html_parts.append(f"<h2>95CI size: {i1}: {f_plot_range95CI_i1:.2f}</h2>")
                     html_parts.append(f"<h2>95CI size: {i2}: {f_plot_range95CI_i2:.2f}</h2>")
+
+                    if hasattr(keys, 'loo') and keys.loo:
+                        elpd_loo_i1 = row['elpd_loo_i1']
+                        elpd_loo_se_i1 = row['elpd_loo_se_i1']
+                        p_loo_i1 = row['p_loo_i1']
+                        loo_bad_k_i1 = row['loo_bad_k_i1']
+
+                        elpd_loo_i2 = row['elpd_loo_i2']
+                        elpd_loo_se_i2 = row['elpd_loo_se_i2']
+                        p_loo_i2 = row['p_loo_i2']
+                        loo_bad_k_i2 = row['loo_bad_k_i2']
+
+                        elpd_loo_diff = row['elpd_loo_pointwise_i1'] - row['elpd_loo_pointwise_i2']
+                        elpd_loo_diff_mean = np.mean(elpd_loo_diff)
+                        elpd_loo_diff_mean_se = np.std(elpd_loo_diff) / np.sqrt(len(elpd_loo_diff))
+
+                        n_data_points = row['n_data_points']
+                        html_parts.append(f"<h2>Number of data points: {n_data_points}, elpd_loo_pointwise_diff: {elpd_loo_diff_mean:.2f} ± {elpd_loo_diff_mean_se:.2f}</h2>")
+
+                        html_parts.append("""
+                            <table border="1" style="border-collapse: collapse;">
+                                <tr>
+                                    <th>Model</th>
+                                    <th>elpd_loo</th>
+                                    <th>SE</th>
+                                    <th>p_loo</th>
+                                    <th>Bad k</th>
+                                </tr>
+                            """)
+
+                        html_parts.append(
+                            f"""
+                            <tr>
+                                <td>{i1}</td>
+                                <td>{elpd_loo_i1:.2f}</td>
+                                <td>{elpd_loo_se_i1:.2f}</td>
+                                <td>{p_loo_i1:.2f}</td>
+                                <td>{loo_bad_k_i1.values}</td>
+                            </tr>
+                            """
+                        )
+
+                        html_parts.append(
+                            f"""
+                            <tr>
+                                <td>{i2}</td>
+                                <td>{elpd_loo_i2:.2f}</td>
+                                <td>{elpd_loo_se_i2:.2f}</td>
+                                <td>{p_loo_i2:.2f}</td>
+                                <td>{loo_bad_k_i2.values}</td>
+                            </tr>
+                            """
+                        )
+
+                        html_parts.append("</table>")
+
+                        # html_parts.append(f"<h2>LOO: {i1}: elpd_loo: {elpd_loo_i1:.2f}, se: {elpd_loo_se_i1:.2f}, p_loo: {p_loo_i1:.2f}, bad k: {loo_bad_k_i1.values}</h2>")
+                        # html_parts.append(f"<h2>LOO: {i2}: elpd_loo: {elpd_loo_i2:.2f}, se: {elpd_loo_se_i2:.2f}, p_loo: {p_loo_i2:.2f}, bad k: {loo_bad_k_i2.values}</h2>")
                 html_parts.append("</body></html>")
                 with open(comparison_report_path, "w") as o:
                     o.write("\n".join(html_parts))

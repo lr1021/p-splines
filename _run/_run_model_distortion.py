@@ -77,6 +77,34 @@ def worker(args):
                     implementation=implementation, penalised=penalised, order=_worker_keys_dict['order'])
             x_plot = np.linspace(np.min(x_data), np.max(x_data), X_plot.shape[0])
 
+            if _worker_keys_dict['loo']:
+                if ("log_likelihood" not in idata.groups()):
+                    print(f"Computing log_likelihood for {model_key}")
+                    with model:
+                        idata = pm.compute_log_likelihood(idata)
+                    # optionally save it back
+                    idata.load()
+                    tmp_path = idata_path + ".tmp"
+                    idata.to_netcdf(tmp_path)
+                    os.replace(tmp_path, idata_path)
+                
+                loo_path = idata_path.replace(".nc", "_loo.pkl")
+                if os.path.exists(loo_path):
+                    with open(loo_path, "rb") as l_path:
+                        loo = pickle.load(l_path)
+                else:
+                    loo = az.loo(idata, pointwise=True)
+                    with open(loo_path, "wb") as l_path:
+                        pickle.dump(loo, l_path)
+                result[f"elpd_loo_i{i+1}"] = loo.elpd_loo
+                result[f"elpd_loo_pointwise_i{i+1}"] = loo.loo_i
+                result[f"elpd_loo_se_i{i+1}"] = loo.se
+                result[f"p_loo_i{i+1}"] = loo.p_loo
+                result[f'n_data_points'] = loo.n_data_points
+                result[f"loo_bad_k_i{i+1}"] = np.sum(loo.pareto_k > loo.good_k)
+    
+                idata.close()
+
             _, w_post_flat = extract_w_post(idata)
             if "beta_0_post" in idata.posterior.data_vars:
                 beta_0_var = "beta_0_post"
@@ -84,11 +112,18 @@ def worker(args):
                 beta_0_var = "beta_0"
             b_post = idata.posterior[beta_0_var].values.flatten()
             f_plot_mean, f_plot_median, f_plot_025, f_plot_975 = f_plot_post(X_plot, w_post_flat, b_post, builder)
+            f_data_mean, f_data_median, f_data_025, f_data_975 = f_plot_post(X, w_post_flat, b_post, builder)
 
             result[f"f_plot_mean_i{i+1}"] = f_plot_mean
             result[f"f_plot_median_i{i+1}"] = f_plot_median
             result[f"f_plot_025_i{i+1}"] = f_plot_025
             result[f"f_plot_975_i{i+1}"] = f_plot_975
+
+            result[f"f_data_mean_i{i+1}"] = f_data_mean
+            result[f"f_data_median_i{i+1}"] = f_data_median
+            result[f"f_data_025_i{i+1}"] = f_data_025
+            result[f"f_data_975_i{i+1}"] = f_data_975
+
             result[f"f_plot_range95CI_i{i+1}"] = np.mean(f_plot_975 - f_plot_025)
         result['f_plot_mean_diff'] = np.sqrt(np.sum((result['f_plot_mean_i1'] - result['f_plot_mean_i2']) ** 2))
         result['f_plot_median_diff'] = np.sqrt(np.sum((result['f_plot_median_i1'] - result['f_plot_median_i2']) ** 2))
@@ -106,15 +141,68 @@ def worker(args):
 
         
 
-        if not (("dengue" in f) or ("cherry" in f)):
+        if not (("dengue" in f) or ("cherry" in f) or ("weighted" in f)):
             f_plot, x_pl = function_plot(f, x_plot, functions, r, x_data)
             ax.plot(x_pl, f_plot, label='True Function', color='black', linestyle='--', linewidth=0.5)
 
         
-
-        if not (builder in ['nb_ortho_diag', 'p_ortho_diag']):
+        if isinstance(y_data, tuple):
+            y_data = y_data[0]
+        if not (builder in ['nb_ortho_diag', 'p_ortho_diag', 'popnb_ortho_diag']):
             ax.scatter(x_data, y_data, marker='x', label='Data', alpha=1.0, s=20, color='blue')
+        else:
+            ax.set_ylim(ymin=0)
+            ax.grid(axis='y', color='gray', linestyle=':', linewidth=0.5, alpha=0.4)
+            knots = (np.max(x_data) - np.min(x_data))/(_worker_keys_dict['n_internal_knots'] + 1) * np.arange(0, _worker_keys_dict['n_internal_knots'] + 2) + np.min(x_data)
+            if _worker_keys_dict['show_knots']:
+                for knot in knots:
+                    ax.axvline(x=knot, color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+            if _worker_keys_dict['show_data_density']:
+                ax_hist = ax.twinx()
+                ax_hist.hist(
+                    x_data,
+                    bins=knots,
+                    density=True,
+                    alpha=0.07,
+                    color='blue',
+                    label='Data Histogram'
+                )
+                ax_hist.hist(
+                    x_data,
+                    bins=knots,
+                    density=True,
+                    histtype='step',
+                    color='black',
+                    linewidth=1.0
+                )
+                ax_hist.set_ylabel("x Data Density")
+                ax_hist.set_zorder(0)          # optional: draw behind main axis
+                ax.patch.set_alpha(0)          # optional: keep histogram visible
+            elif _worker_keys_dict['show_pointwise_loo_diff']:
+                elpd_loo_diff = result['elpd_loo_pointwise_i1'] - result['elpd_loo_pointwise_i2']
+                f_plot_mean_i1, f_plot_mean_i2 = result['f_plot_mean_i1'], result['f_plot_mean_i2']
+                f_scale = np.maximum(np.abs(np.max(f_plot_mean_i1)-np.min(f_plot_mean_i1)), np.abs(np.max(f_plot_mean_i2)-np.min(f_plot_mean_i2)))
 
+                f_data_mean_i1, f_data_mean_i2 = result['f_data_mean_i1'], result['f_data_mean_i2']
+                f_data_mean_diff = np.abs(result['f_data_mean_i1'] - result['f_data_mean_i2'])
+                f_data_025_diff = np.abs(result['f_data_025_i1'] - result['f_data_025_i2'])
+                f_data_975_diff = np.abs(result['f_data_975_i1'] - result['f_data_975_i2'])
+                sig_p = 0.0
+                f_data_sig_diff = ((f_data_mean_diff > sig_p * f_scale) + (f_data_025_diff > sig_p * f_scale) + (f_data_975_diff > sig_p * f_scale)) > 0
+                pointwise_loo_threshold = 0.005
+                elpd_loo_diff_i1_better = elpd_loo_diff > pointwise_loo_threshold
+                elpd_loo_diff_i2_better = (elpd_loo_diff < -pointwise_loo_threshold)
+                
+                ax_loo = ax.twinx()
+                ax_loo.scatter(x_data[(elpd_loo_diff_i2_better)&f_data_sig_diff], elpd_loo_diff[(elpd_loo_diff_i2_better)&f_data_sig_diff], marker='o', label=f'Pointwise LOO: {i2} better', alpha=0.7, s=10, color='green')
+                ax_loo.scatter(x_data[elpd_loo_diff_i1_better & f_data_sig_diff], elpd_loo_diff[elpd_loo_diff_i1_better & f_data_sig_diff], marker='o', label=f'Pointwise LOO: {i1} better', alpha=0.7, s=10, color='red')
+                ax_loo.set_ylabel("elpd loo diff")
+                ax_loo.set_zorder(0)          # optional: draw behind main axis
+                ax.patch.set_alpha(0)         # optional: keep histogram visible
+
+                # elpd_loo_diff mean over distortion regions
+                elpd_loo_diff_mean_distortion = np.mean(elpd_loo_diff[f_data_sig_diff])
+                    
        
                     
         ax.set_title(f"tau 1e-{tau}", fontsize=20)
@@ -122,6 +210,8 @@ def worker(args):
         html_parts.append(f"<img src='data:image/png;base64,{img_base64}' />")
         html_parts.append(f"<h2>95CI size: {i1}: {result['f_plot_range95CI_i1']:.2f}</h2>")
         html_parts.append(f"<h2>95CI size: {i2}: {result['f_plot_range95CI_i2']:.2f}</h2>")
+        if "elpd_loo_diff_mean_distortion" in locals():
+            html_parts.append(f"<h2>elpd loo diff (red - green) mean over distortion regions: {elpd_loo_diff_mean_distortion:.2f}</h2>")
     
     
     legend_fig, legend_ax = plt.subplots(figsize=(4, 2))
@@ -193,6 +283,10 @@ def main(keys_path, distortion_report_key_path):
         'n_internal_knots': keys.n_internal_knots,
         'idatas_path': keys.idatas_path,
         'distortion_report_path': d_keys.distortion_report_path,
+        'show_knots': keys.show_knots if hasattr(keys, 'show_knots') else False,
+        'show_data_density': keys.show_data_density if hasattr(keys, 'show_data_density') else False,
+        'loo': keys.loo if hasattr(keys, 'loo') else False,
+        'show_pointwise_loo_diff': keys.show_pointwise_loo_diff if hasattr(keys, 'show_pointwise_loo_diff') else False
     }
 
     if not os.path.exists(d_keys.distortion_report_path):

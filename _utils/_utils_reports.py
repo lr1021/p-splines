@@ -83,7 +83,7 @@ def f_plot_post(X, w_post_flat, b_post, builder):
         f_p += b_post
 
         if builder in ['popnb_ortho_diag']:
-            f_p -= b_post
+            f_p -= -10.0 #np.mean(b_post)
             f_p = np.exp(f_p)  # exponential transformation for non-negative outputs
         if builder in ['nb_ortho_diag', 'p_ortho_diag']:
             # f_p = np.exp(f_p)
