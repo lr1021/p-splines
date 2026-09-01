@@ -91,6 +91,14 @@ def replication_compute(input):
     # f posterior summaries
     w_post, _ = extract_w_post(idata)
     f_plot_post = w_post @ X_plot.T
+    if "beta_0_post" in idata.posterior.data_vars:
+        beta_0_var = "beta_0_post"
+    else:
+        beta_0_var = "beta_0"
+    # beta_0_var = [v for v in idata.posterior.data_vars if v.startswith("beta_0")][0]
+    b_post = idata.posterior[beta_0_var].values
+    f_plot_post = f_plot_post + b_post[:, :, None]
+    # f_plot_post = f_plot_post - np.mean(f_plot_post, axis=2, keepdims=True)
     f_idata = az.convert_to_inference_data(xr.DataArray(f_plot_post,
                                                         dims=["chain", "draw", "x"]))
     f_rhat = az.rhat(f_idata)["x"].values
@@ -241,6 +249,7 @@ def main_iter(model_keys_df, keys, data):
             "sampling_time_rsd": [np.std(sampling_times)],
             "div>0_rmean": [np.mean(np.array(divergences)>0)],
             "div/samples_rmean": [np.mean(np.array(divergences)/np.array(draws))],
+            "div/samples_rsd": [np.std(np.array(divergences)/np.array(draws))],
             "div>1%samples_rmean": [np.mean(np.array(divergences)/np.array(draws) > 0.01)],
             "total_divergences": [np.sum(divergences)]
         }
@@ -393,6 +402,7 @@ def main_iter(model_keys_df, keys, data):
                 'n_replications': [],
                 'div>0_rmean': [],
                 'div/samples_rmean': [],
+                'div/samples_rsd': [],
                 'div>1%samples_rmean': [],
                 }
         for i, row in unique_keys.iterrows():
@@ -467,6 +477,7 @@ def main_iter(model_keys_df, keys, data):
                 task_summary_df['n_replications'].append(general_summary['n_replications'].values[0])
                 task_summary_df['div>0_rmean'].append(general_summary['div>0_rmean'].values[0])
                 task_summary_df['div/samples_rmean'].append(general_summary['div/samples_rmean'].values[0])
+                task_summary_df['div/samples_rsd'].append(general_summary['div/samples_rsd'].values[0])
                 task_summary_df['div>1%samples_rmean'].append(general_summary['div>1%samples_rmean'].values[0])
 
         html_parts.append(f"<h2>f={f}, sigma={sigma}, builder={builder}</h2>")

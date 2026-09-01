@@ -4,20 +4,20 @@ import shutil
 
 copy_keys = True
 
-run_idatas = False
+run_idatas = True
 replace_idatas = False
 idatas_workers = 100
 
-run_reports = True
+run_reports = False
 replace_reports = False
-reports_workers = 400
+reports_workers = 100
 
 run_replications_report = False
 replace_replications_report = False
 replications_report_workers = 100
 
-run_name = 'Qtau8_a1b1k5_dist'
-data_name = 'dataQ_5_000'
+run_name = 'CDtau3_a1b1k20'
+data_name = 'alt_data_6b_3_1000'
 
 generate_data = False
 quiet = True
@@ -28,109 +28,14 @@ data_path = os.path.join(data_folder, f'{data_name}.pkl')
 ###
 
 # f, sigma
-f_sigma_list = [('uniform_5_10_1000', 0.05),
- ('uniform_5_10_1000', 0.1),
- ('uniform_5_10_1000', 0.5),
- ('uniform_5_10_1000', 1.0),
- ('uniform_5_10_2000', 0.05),
- ('uniform_5_10_2000', 0.1),
- ('uniform_5_10_2000', 0.5),
- ('uniform_5_10_2000', 1.0),
- ('uniform_5_50_1000', 0.05),
- ('uniform_5_50_1000', 0.1),
- ('uniform_5_50_1000', 0.5),
- ('uniform_5_50_1000', 1.0),
- ('uniform_5_50_2000', 0.05),
- ('uniform_5_50_2000', 0.1),
- ('uniform_5_50_2000', 0.5),
- ('uniform_5_50_2000', 1.0),
- ('uniform_5_100_1000', 0.05),
- ('uniform_5_100_1000', 0.1),
- ('uniform_5_100_1000', 0.5),
- ('uniform_5_100_1000', 1.0),
- ('uniform_5_100_2000', 0.05),
- ('uniform_5_100_2000', 0.1),
- ('uniform_5_100_2000', 0.5),
- ('uniform_5_100_2000', 1.0),
- ('uni_normal_5_10_1000', 0.05),
- ('uni_normal_5_10_1000', 0.1),
- ('uni_normal_5_10_1000', 0.5),
- ('uni_normal_5_10_1000', 1.0),
- ('uni_normal_5_10_2000', 0.05),
- ('uni_normal_5_10_2000', 0.1),
- ('uni_normal_5_10_2000', 0.5),
- ('uni_normal_5_10_2000', 1.0),
- ('uni_normal_5_50_1000', 0.05),
- ('uni_normal_5_50_1000', 0.1),
- ('uni_normal_5_50_1000', 0.5),
- ('uni_normal_5_50_1000', 1.0),
- ('uni_normal_5_50_2000', 0.05),
- ('uni_normal_5_50_2000', 0.1),
- ('uni_normal_5_50_2000', 0.5),
- ('uni_normal_5_50_2000', 1.0),
- ('uni_normal_5_100_1000', 0.05),
- ('uni_normal_5_100_1000', 0.1),
- ('uni_normal_5_100_1000', 0.5),
- ('uni_normal_5_100_1000', 1.0),
- ('uni_normal_5_100_2000', 0.05),
- ('uni_normal_5_100_2000', 0.1),
- ('uni_normal_5_100_2000', 0.5),
- ('uni_normal_5_100_2000', 1.0),
- ('bi_normal_5_10_1000', 0.05),
- ('bi_normal_5_10_1000', 0.1),
- ('bi_normal_5_10_1000', 0.5),
- ('bi_normal_5_10_1000', 1.0),
- ('bi_normal_5_10_2000', 0.05),
- ('bi_normal_5_10_2000', 0.1),
- ('bi_normal_5_10_2000', 0.5),
- ('bi_normal_5_10_2000', 1.0),
- ('bi_normal_5_50_1000', 0.05),
- ('bi_normal_5_50_1000', 0.1),
- ('bi_normal_5_50_1000', 0.5),
- ('bi_normal_5_50_1000', 1.0),
- ('bi_normal_5_50_2000', 0.05),
- ('bi_normal_5_50_2000', 0.1),
- ('bi_normal_5_50_2000', 0.5),
- ('bi_normal_5_50_2000', 1.0),
- ('bi_normal_5_100_1000', 0.05),
- ('bi_normal_5_100_1000', 0.1),
- ('bi_normal_5_100_1000', 0.5),
- ('bi_normal_5_100_1000', 1.0),
- ('bi_normal_5_100_2000', 0.05),
- ('bi_normal_5_100_2000', 0.1),
- ('bi_normal_5_100_2000', 0.5),
- ('bi_normal_5_100_2000', 1.0),
- ('exponential_5_10_1000', 0.05),
- ('exponential_5_10_1000', 0.1),
- ('exponential_5_10_1000', 0.5),
- ('exponential_5_10_1000', 1.0),
- ('exponential_5_10_2000', 0.05),
- ('exponential_5_10_2000', 0.1),
- ('exponential_5_10_2000', 0.5),
- ('exponential_5_10_2000', 1.0),
- ('exponential_5_50_1000', 0.05),
- ('exponential_5_50_1000', 0.1),
- ('exponential_5_50_1000', 0.5),
- ('exponential_5_50_1000', 1.0),
- ('exponential_5_50_2000', 0.05),
- ('exponential_5_50_2000', 0.1),
- ('exponential_5_50_2000', 0.5),
- ('exponential_5_50_2000', 1.0),
- ('exponential_5_100_1000', 0.05),
- ('exponential_5_100_1000', 0.1),
- ('exponential_5_100_1000', 0.5),
- ('exponential_5_100_1000', 1.0),
- ('exponential_5_100_2000', 0.05),
- ('exponential_5_100_2000', 0.1),
- ('exponential_5_100_2000', 0.5),
- ('exponential_5_100_2000', 1.0)]
+f_sigma_list = [('f6b', 0.1)]
 ###
-run_comparison_report = False
+run_comparison_report = True
 top_n = 40
 spread = True
 spread_start = 0
 spread_step = 1
-comparison_list = [('ortho_conditioning', 'svd')]
+comparison_list = [('ortho_centring+dropping', 'svd')]
 replace_comparison_report = True
 ###
 
@@ -139,12 +44,12 @@ if generate_data:
     _run_generate_data.main(data_path, f_sigma_list, generate_data)
 
 # replication
-replication_list = list(range(50))[::]
+replication_list = list(range(360))[::]
 report_replication_list = replication_list# list(range(100))[:]
-report_replication_list = replication_list[:2]
+report_replication_list = replication_list[:]
 # implementation
 implementation_list = ['svd',
-                       'ortho_conditioning',]
+                       'ortho_centring+dropping',]
 
 
 # 0, MvN, ortho_diag
@@ -157,7 +62,7 @@ a = 1
 b = 0.1
 order = 2
 spline_degree = 3
-n_internal_knots = 5
+n_internal_knots = 20
 
 n_tune = 1000
 n_draws = 2000

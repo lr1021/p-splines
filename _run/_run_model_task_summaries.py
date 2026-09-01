@@ -25,9 +25,9 @@ warnings.filterwarnings('ignore')
 metric_list = {'metric':[], 'val_col':[], 'sd_col':[], 'val_curve':[], 'sd_curve':[]}
 
 # f_ESS_bulk
-metric_list['metric'].append('f_umean_ess_bulk')
-metric_list['val_col'].append('f (summary) umean_ess_bulk_rmean')
-metric_list['sd_col'].append('f (summary) umean_ess_bulk_rsd')
+# metric_list['metric'].append('f_umean_ess_bulk')
+# metric_list['val_col'].append('f (summary) umean_ess_bulk_rmean')
+# metric_list['sd_col'].append('f (summary) umean_ess_bulk_rsd')
 
 # f_ESS_bulk/s
 metric_list['metric'].append('f_umean_ess_bulk/s')
@@ -35,9 +35,9 @@ metric_list['val_col'].append('f (summary) umean_ess_bulk/s_rmean')
 metric_list['sd_col'].append('f (summary) umean_ess_bulk/s_rsd')
 
 # f_ESS_tail
-metric_list['metric'].append('f_umean_ess_tail')
-metric_list['val_col'].append('f (summary) umean_ess_tail_rmean')
-metric_list['sd_col'].append('f (summary) umean_ess_tail_rsd')
+# metric_list['metric'].append('f_umean_ess_tail')
+# metric_list['val_col'].append('f (summary) umean_ess_tail_rmean')
+# metric_list['sd_col'].append('f (summary) umean_ess_tail_rsd')
 
 # f_ESS_tail/s
 metric_list['metric'].append('f_umean_ess_tail/s')
@@ -45,28 +45,33 @@ metric_list['val_col'].append('f (summary) umean_ess_tail/s_rmean')
 metric_list['sd_col'].append('f (summary) umean_ess_tail/s_rsd')
 
 # f any rhat
-metric_list['metric'].append('f_uany_rhat>=1.01')
-metric_list['val_col'].append('f (summary) uany_r_hat>=1.01_rmean')
-metric_list['sd_col'].append(None)
+# metric_list['metric'].append('f_uany_rhat>=1.01')
+# metric_list['val_col'].append('f (summary) uany_r_hat>=1.01_rmean')
+# metric_list['sd_col'].append(None)
 
 # sampling time
-metric_list['metric'].append('sampling_time')
-metric_list['val_col'].append('sampling_time_rmean')
-metric_list['sd_col'].append('sampling_time_rsd')
+# metric_list['metric'].append('sampling_time')
+# metric_list['val_col'].append('sampling_time_rmean')
+# metric_list['sd_col'].append('sampling_time_rsd')
 
-# divergences > 0 
-metric_list['metric'].append('div>0')
+# divergences > 0 % 
+metric_list['metric'].append('div>0%')
 metric_list['val_col'].append('div>0_rmean')
 metric_list['sd_col'].append(None)
 
+# divergences %
+metric_list['metric'].append('div/samples%')
+metric_list['val_col'].append('div/samples_rmean')
+metric_list['sd_col'].append('div/samples_rsd')
+
 # divergences > 1%
-metric_list['metric'].append('div>1%samples')
+metric_list['metric'].append('div>1%samples%')
 metric_list['val_col'].append('div>1%samples_rmean')
 metric_list['sd_col'].append(None)
 ######################
 def main(keys_path):
-
     # base and title
+    print(keys_path)
     title = f"Task Summaries Report"
     parts = [f"<html><head><title>{title}</title>",
                         "<style>",
@@ -77,9 +82,12 @@ def main(keys_path):
                         "img { max-width: 80%; margin: 8px auto; display: block; }",
                         "</style></head><body>",
                         f"<h1>{title}</h1>"]
+    parts.append(f"<h2>Points = mean across replications, Intervals = Standard Deviation of the Mean</h2>")
     
     keys_loc = keys_path.replace('/', '.').removesuffix('.py')
     keys = import_module(keys_loc)
+    print(keys.implementation_list)
+    # keys.implementation_list = ['svd', 'post_centring', 'ortho_post_centring'][:]
     task_summary_report_path = os.path.join(keys.reports_path, "../task_summary_report.html")
 
     task_summary_folder = os.path.join(keys.reports_path, "../replication_reports/task_summaries")
@@ -109,6 +117,8 @@ def main(keys_path):
     tasks_df.sort_values(by=['penalised', 'f', 'sigma', 'Implementation'], inplace=True)
 
     for penalised in sorted(tasks_df['penalised'].unique()):
+    # for penalised in sorted(keys.penalised_list):
+        #print(penalised)
         current_df = tasks_df[tasks_df['penalised'] == penalised].copy()
 
         # Define task ordering once
@@ -134,6 +144,9 @@ def main(keys_path):
             fig, ax = plt.subplots(figsize=(12, 6))
 
             for implementation in sorted(current_df['Implementation'].unique()):
+            # print(current_df['Implementation'].unique())
+            # for implementation in sorted(keys.implementation_list):
+                # print(implementation)
 
                 impl_df = current_df[
                     current_df['Implementation'] == implementation
@@ -147,14 +160,20 @@ def main(keys_path):
                 )
 
                 y = plot_df[val_col].astype(float).values
+                
 
                 if sd_col is not None:
-                    se = (
-                        plot_df[sd_col].astype(float).values
-                        / np.sqrt(plot_df['n_replications'].astype(float).values)
-                    )
+                    # se = (
+                    #     plot_df[sd_col].astype(float).values
+                    #     / np.sqrt(plot_df['n_replications'].astype(float).values)
+                    # )
+                    se = plot_df[sd_col].astype(float).values
                 else:
                     se = np.zeros_like(y)
+
+                if metric[-1] == '%':
+                    y = y * 100  # convert to percentage
+                    se = se * 100  # convert to percentage
 
                 ax.plot(x, y, marker='o', label=implementation)
 

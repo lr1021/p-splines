@@ -60,7 +60,11 @@ def worker(args):
             idata_path = write_idata_path(model_key, _worker_keys_dict['idatas_path'])
             idata_path = re.sub(r'tau[-+eE.\d]+', f'tau{tau}', idata_path)
             if os.path.exists(idata_path):
-                idata = az.from_netcdf(idata_path)
+                try:
+                    idata = az.from_netcdf(idata_path)
+                except Exception as e:
+                    print(f"Error occurred while loading {idata_path}: {e}")
+                    raise
             else:
                 raise FileNotFoundError(f"{idata_path} not found")
             model_data = _worker_data[(f, sigma)][r]
@@ -142,8 +146,12 @@ def worker(args):
         
 
         if not (("dengue" in f) or ("cherry" in f) or ("weighted" in f)):
-            f_plot, x_pl = function_plot(f, x_plot, functions, r, x_data)
-            ax.plot(x_pl, f_plot, label='True Function', color='black', linestyle='--', linewidth=0.5)
+            try:
+                f_plot, x_pl = function_plot(f, x_plot, functions, r, x_data)
+                ax.plot(x_pl, f_plot, label='True Function', color='black', linestyle='--', linewidth=0.5)
+            except Exception as e:
+                print(f"Error occurred while plotting true function for {f}: {e}")
+                raise
 
         
         if isinstance(y_data, tuple):

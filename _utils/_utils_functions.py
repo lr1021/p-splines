@@ -34,7 +34,7 @@ def f4b(x):
     B = eval_B['B']
     c = B[:, -1]
     c = c/(np.max(c) - np.min(c))*5.0
-    return c*200.0
+    return c*200.0 /1000
 
 def f5b(x):
     spline_degree = 3
@@ -70,7 +70,7 @@ def f6b(x):
     B = eval_B['B']
     c = B[:, -1]
     c = c/(np.max(c) - np.min(c))*5.0
-    return c*200.0
+    return c*200.0 / 1000
 
 def f7b(x):
     spline_degree = 3

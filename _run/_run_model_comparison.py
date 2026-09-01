@@ -223,7 +223,7 @@ def main(keys_path):
                     ax.fill_between(x_plot, f_plot_025_i1, f_plot_975_i1, color=c1, alpha=0.08, label=f'95% Credible Interval {i1}', linewidth=0.5)
                     ax.fill_between(x_plot, f_plot_025_i2, f_plot_975_i2, color=c2, alpha=0.08, label=f'95% Credible Interval {i2}', linewidth=0.5)
 
-                    if not (("dengue" in f) or ("cherry" in f) or ("weighted" in f)):
+                    if not (("dengue" in f) or ("cherry" in f) or ("weighted" in f) or ("df" in f)):
                         f_plot, x_pl = function_plot(f, x_plot, functions, r, x_data)
                         ax.plot(x_pl, f_plot, label='True Function', color='black', linestyle='--', linewidth=0.5)
 

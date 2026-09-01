@@ -62,26 +62,60 @@ def function_plot(f, x_plot, functions, replication, x_data):
         if f in functions:
             return functions[f](x_plot), x_plot
         elif np.any([f_name_start in f for f_name_start in ['uniform', 'exponential', 'uni_normal', 'bi_normal']]):
-            m = re.fullmatch(r'([A-Za-z_]+)_(\d+)_(\d+)_(\d+)', f)
-            function_name = m.group(1)
-            num_knots = int(m.group(2))
-            n_val = int(m.group(3))
-            scale = int(m.group(4))
+            if np.any([f_name_start in f for f_name_start in ['uni_normal', 'bi_normal']]) or (len(f.split('_')) == 4):
+                # print(f)
+                m = re.fullmatch(r'([A-Za-z_]+)_(\d+)_(\d+)_(\d+)', f)
+                function_name = m.group(1)
+                num_knots = int(m.group(2))
+                n_val = int(m.group(3))
+                scale = int(m.group(4))
+                # curve_plot_dict_path = os.path.join("data", f"curve_plot_dict_{num_knots}.pkl")
+                curve_plot_dict_path = os.path.join("data", f"curve_plot_dict_{num_knots}_01.pkl")
+                # curve_plot_dict_path = os.path.join("data", f"curve_plot_dict_{num_knots}_01_alt.pkl")
+                # curve_plot_dict_path = os.path.join("data", f"curve_plot_dict_{num_knots}_01_alt_bi.pkl")
+                try:
+                    with open(curve_plot_dict_path, "rb") as pl:
+                        curve_plot_dict = pickle.load(pl)
+                    try:
+                        f_plot = curve_plot_dict[(function_name, n_val, replication)]*scale
+                    except Exception as e:
+                        print(f"Error occurred while accessing curve plot for {f}: {e}")
+                        raise
+                    x_pl = np.linspace(np.min(x_data), np.max(x_data), len(f_plot))
+                except Exception as e:
+                    print(f"Error occurred while loading curve plot for {f}: {e}")
+                    raise
+            else:
+                m = re.fullmatch(
+                    r'([A-Za-z_]+)_(\d+)_(\d+)_([0-9.]+)_([0-9.]+)_(\d+)',
+                    f
+                )
+                function_name = m.group(1)
+                num_knots = int(m.group(2))
+                n_val = int(m.group(3))
+                lim = float(m.group(4))
+                sparse = float(m.group(5))
+                scale = int(m.group(6))
+                curve_plot_dict_path = os.path.join("data", f"curve_plot_dict_CD{num_knots}_01.pkl")
+                try:
+                    with open(curve_plot_dict_path, "rb") as pl:
+                        curve_plot_dict = pickle.load(pl)
+                    f_plot = curve_plot_dict[(function_name, n_val, lim, sparse, replication)]*scale
+                    x_pl = np.linspace(np.min(x_data), np.max(x_data), len(f_plot))
+                except Exception as e:
+                    print(f"Error occurred while loading curve plot for {f}: {e}")
+                    raise
+            
 
-            curve_plot_dict_path = os.path.join("data", f"curve_plot_dict_{num_knots}.pkl")
-            with open(curve_plot_dict_path, "rb") as pl:
-                curve_plot_dict = pickle.load(pl)
-            f_plot = curve_plot_dict[(function_name, n_val, replication)]*scale
-            x_pl = np.linspace(np.min(x_data), np.max(x_data), len(f_plot))
-
-            return f_plot, x_pl
+        return f_plot, x_pl
 
 def f_plot_post(X, w_post_flat, b_post, builder):
         f_p = X @ w_post_flat.T
         
         # x_plot = x_data[x_data_order]
         f_p += b_post
-
+        if builder in ['ortho_diag_softplus']:
+            f_p = np.log(1 + np.exp(f_p))  # softplus transformation for non-negative outputs
         if builder in ['popnb_ortho_diag']:
             f_p -= -10.0 #np.mean(b_post)
             f_p = np.exp(f_p)  # exponential transformation for non-negative outputs
@@ -164,6 +198,14 @@ def html_report(model_key, reports_path, idatas_path, functions,
     w_post, _ = extract_w_post(idata)
     #f_p = np.einsum('ij,cdj->cdi', X_plot, w_post)
     f_p = w_post @ X_plot.T
+    if "beta_0_post" in idata.posterior.data_vars:
+        beta_0_var = "beta_0_post"
+    else:
+        beta_0_var = "beta_0"
+    # beta_0_var = [v for v in idata.posterior.data_vars if v.startswith("beta_0")][0]
+    b_post = idata.posterior[beta_0_var].values
+    f_p = f_p + b_post[:, :, None]
+    # f_plot_post = f_plot_post - np.mean(f_plot_post, axis=2, keepdims=True)
     f_idata = az.convert_to_inference_data(xr.DataArray(f_p,
                                                         dims=["chain", "draw", "x"]))
     f_rhat = az.rhat(f_idata)["x"].values
@@ -246,7 +288,7 @@ def html_report(model_key, reports_path, idatas_path, functions,
     ax.plot(x_plot, f_plot_median, label='Posterior Median', color='orange', linestyle='dashed')
     ax.fill_between(x_plot, f_plot_025, f_plot_975, color='red', alpha=0.3, label='95% Credible Interval')
     
-    if not (('dengue' in f) or ('cherry' in f) or ('weighted' in f)):
+    if not (('dengue' in f) or ('cherry' in f) or ('weighted' in f) or ('df3' in f)):
         f_plot, x_pl = function_plot(f, x_plot, functions, replication, x_data)
         ax.plot(x_pl, f_plot, label='True Function', color='green')
 
