@@ -4,7 +4,7 @@ import shutil
 
 copy_keys = True
 
-run_idatas = True
+run_idatas = False
 replace_idatas = False
 idatas_workers = 100
 
@@ -16,11 +16,11 @@ run_replications_report = False
 replace_replications_report = False
 replications_report_workers = 100
 
-run_name = 'CDtau3_a1b1k20'
-data_name = 'alt_data_6b_3_1000'
+run_name = 'Q2tau2_a1b1k5'
+data_name = 'dataQ_5_01_mult'
 
 generate_data = False
-quiet = True
+quiet = False
 ###
 data_folder = 'data/'
 os.makedirs(data_folder, exist_ok=True)
@@ -28,14 +28,32 @@ data_path = os.path.join(data_folder, f'{data_name}.pkl')
 ###
 
 # f, sigma
-f_sigma_list = [('f6b', 0.1)]
+f_sigma_list = [
+    ("('exponential', 'exponential')_5_10_1", 0.05),
+    ("('exponential', 'exponential')_5_10_1", 0.1),
+    ("('exponential', 'exponential')_5_10_1", 0.5),
+    ("('exponential', 'exponential')_5_10_1", 1.0),
+    ("('exponential', 'exponential')_5_10_1", 5.0),
+
+    ("('exponential', 'exponential')_5_50_1", 0.05),
+    ("('exponential', 'exponential')_5_50_1", 0.1),
+    ("('exponential', 'exponential')_5_50_1", 0.5),
+    ("('exponential', 'exponential')_5_50_1", 1.0),
+    ("('exponential', 'exponential')_5_50_1", 5.0),
+
+    ("('exponential', 'exponential')_5_100_1", 0.05),
+    ("('exponential', 'exponential')_5_100_1", 0.1),
+    ("('exponential', 'exponential')_5_100_1", 0.5),
+    ("('exponential', 'exponential')_5_100_1", 1.0),
+    ("('exponential', 'exponential')_5_100_1", 5.0),
+ ]
 ###
 run_comparison_report = True
 top_n = 40
 spread = True
 spread_start = 0
 spread_step = 1
-comparison_list = [('ortho_centring+dropping', 'svd')]
+comparison_list = [('ortho_conditioning', 'svd')]
 replace_comparison_report = True
 ###
 
@@ -44,16 +62,16 @@ if generate_data:
     _run_generate_data.main(data_path, f_sigma_list, generate_data)
 
 # replication
-replication_list = list(range(360))[::]
+replication_list = list(range(100))[::]
 report_replication_list = replication_list# list(range(100))[:]
 report_replication_list = replication_list[:]
 # implementation
 implementation_list = ['svd',
-                       'ortho_centring+dropping',]
+                       'ortho_conditioning']
 
 
 # 0, MvN, ortho_diag
-builder_list = ['ortho_diag']
+builder_list = ['ortho_diag_mult']
 # penalised
 penalised_list = [False]
 
@@ -62,7 +80,7 @@ a = 1
 b = 0.1
 order = 2
 spline_degree = 3
-n_internal_knots = 20
+n_internal_knots = 5
 
 n_tune = 1000
 n_draws = 2000

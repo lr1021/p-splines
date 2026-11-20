@@ -270,14 +270,14 @@ def worker(args):
             color=c1,
             alpha=0.3,
             lw=8,
-            label=f"95% CI {i1}",
+            label=f"95% Credible Interval {i1}",
         ),
         Line2D(
             [0], [0],
             color=c2,
             alpha=0.3,
             lw=8,
-            label=f"95% CI {i2}",
+            label=f"95% Credible Interval {i2}",
         ),
         Line2D(
             [0], [0],

@@ -229,8 +229,8 @@ def worker(args):
     handles = [
         Line2D([0], [0], color='red', label=f'Posterior Mean {i1}'),
         Line2D([0], [0], color='green', label=f'Posterior Mean {i2}'),
-        Line2D([0], [0], color='red', alpha=0.3, lw=8, label=f'95% CI {i1}'),
-        Line2D([0], [0], color='green', alpha=0.3, lw=8, label=f'95% CI {i2}'),
+        Line2D([0], [0], color='red', alpha=0.3, lw=8, label=f'95% Credible Interval {i1}'),
+        Line2D([0], [0], color='green', alpha=0.3, lw=8, label=f'95% Credible Interval {i2}'),
         Line2D([0], [0], color='black', linestyle='--', label='True Function'),
         Line2D([0], [0], marker='x', color='blue', linestyle='', label='Data'),
     ]
