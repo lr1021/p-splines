@@ -649,7 +649,8 @@ def build_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal_knots
     model = pm.Model()
     with model:
         # Priors
-        beta_0 = pm.Normal('beta_0', mu=0, sigma=100)
+        if implementation != 'opr_exact':
+            beta_0 = pm.Normal('beta_0', mu=0, sigma=100)
         sigma_2 = pm.InverseGamma('sigma_2', alpha=a, beta=b)
 
         var_names = ['beta_0', 'sigma_2', 'tau']
@@ -665,6 +666,7 @@ def build_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal_knots
         eval_B = eval_spline_basis_equispaced_numeric(spline_degree, np.min(x_data), np.max(x_data), n_internal_knots, x_data)
         B = eval_B['B']
         k = B.shape[1]
+        n = B.shape[0]
 
         x_plot = np.linspace(np.min(x_data), np.max(x_data), 500)
         eval_B_plot = eval_spline_basis_equispaced_numeric(spline_degree, np.min(x_data), np.max(x_data), n_internal_knots, x_plot)
@@ -1172,6 +1174,52 @@ def build_model_ortho_diag(x_data, y_data, a, b, spline_degree, n_internal_knots
             # return K, K_V, K_U, Q, X, X_plot
             f = pm.math.dot(X, w_svd)
             var_names += ['w_svd']
+        
+        elif implementation=='opr_exact': # opr svd exact
+            X = B.copy()
+            level_B = B.copy()
+            X_plot = B_plot.copy()
+            X_plot = X_plot - X.mean(axis=0)
+            
+            X_ = X - X.mean(axis=0)
+            U, S, Vt = np.linalg.svd(X_, full_matrices=False)
+            Up = U[:, :-1]
+            Sp = S[:-1]
+            Vp = Vt[:-1, :].T
+
+            X_plot = X_plot @ Vp
+
+            X = Up * Sp
+
+            # return U, S, Vt, Up, Sp, Vp, X, X_plot
+
+            model.add_coord("w_svd_dim", range(k-1))
+            if not penalised:
+                w_svd = pm.Normal("w_svd", mu=0, tau=tau, shape=k-1, dims="w_svd_dim")
+                # level
+                g = level_B.mean(axis=0)@Vp
+            else:
+                K = Vp.T @ difference_matrix(k, order=order).T @ difference_matrix(k, order=order) @ Vp
+                K_V, K_U = np.linalg.eigh(K)
+                Q = tau_p * K_V + tau
+                # Q = pt.maximum(Q, 1e-8)
+                w_svd = pm.Normal("w_svd", mu=0, tau=Q, shape=k-1, dims="w_svd_dim")
+                X = X @ K_U
+                X_plot = X_plot @ K_U
+
+                # level
+                g = level_B.mean(axis=0)@Vp@K_U
+
+            gamma_mu = 0
+            beta_0_mu = gamma_mu + (g @ w_svd)
+            sigma_gamma_2 = 100**2
+            beta_0_sigma_2 = sigma_gamma_2 + 1/(tau * k)
+            beta_0 = pm.Normal('beta_0', mu=beta_0_mu, sigma=pt.sqrt(beta_0_sigma_2))
+                
+            # return K, K_V, K_U, Q, X, X_plot
+            f = pm.math.dot(X, w_svd)
+            var_names += ['w_svd']
+
         else:
             raise ValueError("Implementation not recognised")
         
